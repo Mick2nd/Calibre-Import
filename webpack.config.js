@@ -116,9 +116,11 @@ function readManifest(manifestPath) {
 }
 
 function createPluginArchive(sourceDir, destPath) {
-	const distFiles = glob.sync(`${sourceDir}/**/*`, { nodir: true })
+	const distFiles = glob.sync(`${sourceDir}/**/*`, { nodir: true, windowsPathsNoEscape: true })
 		.map(f => f.substr(sourceDir.length + 1));
 
+	console.log(sourceDir + ' / ' + destPath);
+	console.log(distFiles);
 	if (!distFiles.length) throw new Error('Plugin archive was not created because the "dist" directory is empty');
 	fs.removeSync(destPath);
 
