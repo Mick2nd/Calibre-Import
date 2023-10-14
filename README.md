@@ -43,3 +43,20 @@ A list of configuration settings follows (incomplete):
 5. The cover height, used in a *style* section
 6. The *Merge Mode* controls how conflicts between existing and new content are solved
 7. The *Cleanup Mode* controls cleanup behavior after the import is complete. This defaults to deletion of the content not present in the input
+
+### Sample Screen Shots of Generated Notes
+
+The images are partly in German.
+
+The following is a generated Genre tree.
+
+![A generated genre tree](./doc/Genre%20Tree.png)
+
+It follows a generated Note, one version with Spoilers collapsed, the other version with expanded Spoilers.
+
+![A generated note, spoilers expanded](./doc/Rendered%20MD,%20Spoilers%20Collapsed.png)
+
+Spoilers expanded:
+
+![A generated note](./doc/Rendered%20MD,%20Spoilers%20Expanded.png)
+ 
