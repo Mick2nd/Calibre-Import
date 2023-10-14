@@ -175,10 +175,11 @@ export class Calibre
 	 */
 	populate_notes = async function(val: number) : Promise<void>
 	{
+		const filterTitles = await settings.filterTitles();
 		const books = await this.all(
-			`SELECT books.id, books.title, books.path, books.has_cover, books.timestamp, books.author_sort FROM books ` +
+			`SELECT books.id, books.title, books.path, books.has_cover, books.timestamp, books.last_modified, books.author_sort FROM books ` +
 			`INNER JOIN ${this.genre_link_table} AS link ON books.id = link.book ` +
-			`WHERE link.value = ?`, [val]);
+			`WHERE link.value = ? AND books.title LIKE ?`, [val, filterTitles]);
 		console.debug(`Books: ${JSON.stringify(books)}`);
 		for (let book of books)
 		{

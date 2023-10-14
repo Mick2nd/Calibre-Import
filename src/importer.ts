@@ -1,8 +1,6 @@
-import joplin from 'api';
 import { Calibre } from './calibre';
 import { IEvents } from './events';
 import { Tree } from './joplinData';
-
 
 
 export class Importer

@@ -2,11 +2,8 @@ import joplin from 'api';
 import { ImportContext, FileSystemItem, ContentScriptType } from 'api/types';
 import { Importer } from './importer';
 import { DataExchangeNs } from './dataExchange';
-require('source-map-support').install();
+// require('source-map-support').install();
 
-import { IEvents } from './events';
-import { Joplin } from './joplin';
-import { Tree } from './joplinData';
 import { settings } from './settings';
 
 

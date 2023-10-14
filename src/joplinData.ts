@@ -6,7 +6,7 @@ import { CleanupMode, MergeMode, settings } from './settings';
 
 
 /**
- * @abstract Types enum
+ * @abstract Types enum for Nodes
  * 
  */
 export enum Type
@@ -16,6 +16,10 @@ export enum Type
 	Note
 }
 
+/**
+ * @abstract Status used during import operation
+ * 
+ */
 export enum Status
 {
 	Undefined,
@@ -149,12 +153,14 @@ export class Note extends Node
 	async integrateContent(library_path: string, ebook: any) : Promise<Note>
 	{
 		console.debug(`Note.integrateContent: `);
+		this.created = ebook['timestamp'];														// will be used as created / updated times
+		this.updated = ebook['last_modified'];
 		const title = `${ebook['title']} (${ebook['id']})`;
 		this.title = title;
 		
 		const book_path = ebook['path'];
 		const has_cover = ebook['has_cover'];
-		let md = `${this.styles()}# ${ebook['title']}\n\n`;										// adds styles and a title
+		let md = `${await this.styles()}# ${ebook['title']}\n\n`;								// adds styles and a title
 		if (has_cover)
 		{
 			const cover_path = path.join(library_path, book_path, 'cover.jpg');
@@ -178,8 +184,7 @@ export class Note extends Node
 		}
 		
 		this.body = md;
-		const timestamp = ebook['timestamp'];													// will be used as created / updated times
-		joplinServices.set_time(timestamp, timestamp);
+		joplinServices.set_time(this.created, this.updated);
 
 		if (this.id === '')																		// this Note is new, does not have an id yet
 		{
@@ -194,24 +199,42 @@ export class Note extends Node
 		return this;
 	}
 	
+	/**
+	 * @abstract Import operation if status is Merge, e.g. Note is already present in Joplin
+	 * 			 and again present in Import collection. Uses the merge mode to decide about
+	 * 			 operation.
+	 * 
+	 * @param library_path - the path to the Calibre library
+	 * @param ebook - the ebook's data
+	 */
 	public async mergeFromEbook(library_path: string, ebook: any) : Promise<void>
 	{
 		this.status = Status.Merge;
 		const mergeMode = await settings.mergeMode();
+		const updated = ebook['last_modified'];													// used for merge mode
+		
 		if (mergeMode == MergeMode.Leave)
 		{
 			
 		}
 		else if (mergeMode == MergeMode.Merge)
 		{
-			
+			if (updated > this.updated)															// ebook meta data newer then Joplin entry
+			{
+				console.debug('About to update note');
+				await this.integrateContent(library_path, ebook);
+			}
 		}
-		else // Replace
+		else if (mergeMode == MergeMode.Replace)
 		{
 			await this.integrateContent(library_path, ebook);
 		}
 	}
 	
+	/**
+	 * @abstract Cosntructor. Can be invoked by fromEbook or Book.fillNotes
+	 * 
+	 */
 	public constructor(parent: IBook2, raw: any)
 	{
 		super(parent, raw);
@@ -219,9 +242,32 @@ export class Note extends Node
 		this.status = Status.Present;
 		
 		this.body = raw['body'];
+		if (raw['user_created_time'])													// raw comes from Joplin API
+		{
+			this.created = new Date(raw['user_created_time']).toISOString();
+			this.created = this.created.replace('T', ' ').replace('Z', '+00:00');
+			this.updated = new Date(raw['user_updated_time']).toISOString();
+			this.updated = this.updated.replace('T', ' ').replace('Z', '+00:00');
+		}
 		parent.notes.push(this);
 	}
 	
+	/**
+	 * @abstract Returns the required Note fields
+	 * 
+	 */
+	static get requiredFields() : string[]
+	{
+		return ['id', 'parent_id', 'title', 'user_updated_time', 'user_created_time'];
+	}
+	
+	/**
+	 * @abstract Provides content for a MD Note depending on the useSpoilers setting.
+	 * 			 It is either a Spoiler or pure MD.
+	 *
+	 * @param label - the label for the content
+	 * @param content - the content itself 
+	 */
 	async spoiler(label: string, content: string) : Promise<string>
 	{
 		if (await settings.useSpoilers())
@@ -246,6 +292,12 @@ ${content}
 `;		}
 	}
 	
+	/**
+	 * @abstract Provides table entry for the ebook formats
+	 * 
+	 * @param library_path - the library path, used to build links
+	 * @param book - the ebook
+	 */
 	formats(library_path: string, book: any) : string
 	{
 		const book_path = path.join(library_path, book['path']);
@@ -258,11 +310,15 @@ ${content}
 		return `|Formats:|${links.join(', ')}|`;
 	}
 	
-	styles() : string
+	/**
+	 * @abstract Provides note specific styles to be inserted at the beginning
+	 * 
+	 */
+	async styles() : Promise<string>
 	{
 		return `
 <style>
-	img { height: 600px; }
+	img { height: ${await settings.coverHeight()}; }
 	table { border-style: hidden; border-collapse: collapse; }
 	thead { display: none; }
 	td { font-size: small; }
@@ -272,14 +328,24 @@ ${content}
 	}
 	
 	body: string;
+	created: string = new Date().toUTCString();
+	updated: string = new Date().toUTCString();
 }
 
+
 /**
- * @abstract A Book class
+ * @abstract A Book class representing a Joplin Notebook
  * 
  */
 export class Book extends Node implements IBook2
 {
+	/**
+	 * @abstract An asynchronous constructor function
+	 * 			 Additionally to the constructor fills the Notes array.
+	 * 
+	 * @param parent - the parent book or tree
+	 * @param raw - the raw data for the book
+	 */
 	public static async default(parent: IBook, raw: any) : Promise<Book>
 	{
 		const book = new Book(parent, raw);
@@ -288,6 +354,12 @@ export class Book extends Node implements IBook2
 		return book;
 	}
 	
+	/**
+	 * @abstract Constructor.
+	 * 
+	 * @param parent - the parent book or tree
+	 * @param raw - the raw data for the book
+	 */
 	constructor(parent: IBook, raw: any)
 	{
 		super(parent, raw);
@@ -300,15 +372,27 @@ export class Book extends Node implements IBook2
 		this.parent.books.push(this);
 	}
 	
+	/**
+	 * @abstract Fills the Joplin Notes into the book belonging to this Notebook
+	 * 
+	 */
 	async fillNotes() : Promise<void>
 	{
-		const raw_notes = (await joplin.data.get(['folders', `${this.id}`, 'notes'])).items;
-		for (const raw_note of raw_notes)
+		for await (const raw_note of joplinServices.all(								// this api allows for single iteration through all pages
+			['folders', `${this.id}`, 'notes'],
+			{ fields: Note.requiredFields }
+		))
 		{
-			const note = new Note(this, raw_note);
+			const note = new Note(this, raw_note);										// appends Note to parents books array 
 		}
+		console.dir(this);
 	}
 
+	/**
+	 * @abstract Invoked by the Tree.onBook 
+	 * 
+	 * @param genre - the genre to be represented by this book
+	 */
 	async onBook(genre: string) : Promise<Book>
 	{
 		let book = this.lookupBook(genre);
@@ -330,6 +414,15 @@ export class Book extends Node implements IBook2
 		return book;
 	}
 
+	/**
+	 * @abstract Invoked by Tree.onNote
+	 * 
+	 * Depending from the presence of the Note in Joplin (e.g. Status) is the handling by
+	 * different instantiations.
+	 * 
+	 * @param library_path - the Calibre library path
+	 * @param ebook - the ebook's raw data from Calibre
+	 */
 	async onNote(library_path: string, ebook: any) : Promise<void>
 	{
 		let note = this.lookupNote(ebook);
@@ -344,11 +437,20 @@ export class Book extends Node implements IBook2
 		}
 	}
 	
+	/**
+	 * @abstract Lookup a Book by title (originated by genre)
+	 * 
+	 */
 	lookupBook(title: string) : Book | undefined
 	{
 		return this.books.find((book: any) => book.title == title) as Book;
 	}
 	
+	/**
+	 * @abstract Lookup a Note by title. The title is different from the original title
+	 * 			 in that it consists of original Ebook's title and id fields.
+	 * 
+	 */
 	lookupNote(ebook: any) : Note | undefined
 	{
 		const title = `${ebook['title']} (${ebook['id']})`;
@@ -374,15 +476,7 @@ export class Tree implements IBook, IEvents
 		const tree = new Tree();
 		
 		await tree.fillRaw();
-		await tree.prepare();
-		
-		/**
-		 * TEST CODE
-		 */
-		for (const book of forEach(tree))
-		{
-			console.debug(book.title);
-		}
+		await tree.prepareTree();
 		
 		return tree; 
 	}
@@ -396,7 +490,12 @@ export class Tree implements IBook, IEvents
 		return this.parents[id];
 	}
 
-	
+	/**
+	 * @abstract The import process is accompanied by the invokation of the IEvent methods.
+	 * 			 Calibre -> Tree
+	 * 
+	 * This one indicates the start of the import.
+	 */
 	async onStart() : Promise<void>
 	{
     	console.info('Tree.onStart');
@@ -404,24 +503,49 @@ export class Tree implements IBook, IEvents
 		this.book = this.lookupParent(this.folder.id);
 	}
 
+	/**
+	 * @abstract The import process is accompanied by the invokation of the IEvent methods.
+	 * 			 Calibre -> Tree
+	 *
+	 * This one indicates the delivery of a Genre.
+	 */
 	async onBook(level: number, genre: string, id: number) : Promise<void>
 	{
     	console.info(`Tree.onBook : ${genre}`);
 		this.sub_book = await (this.book as Book).onBook(genre);
 	}
 
+	/**
+	 * @abstract The import process is accompanied by the invokation of the IEvent methods.
+	 * 			 Calibre -> Tree
+	 * 
+	 * This one indicates the delivery of an Ebook.
+	 */
 	async onNote(library_path: string, book: any) : Promise<void>
 	{
     	console.info(`Tree.onNote ${book['title']}`);
 		await (this.sub_book as Book).onNote(library_path, book);
 	}
 
+	/**
+	 * @abstract The import process is accompanied by the invokation of the IEvent methods.
+	 * 			 Calibre -> Tree
+	 * 			 This is one of them.
+	 * 
+	 * This one indicates the increase of the nesting level.
+	 */
 	onIncrease() : void
 	{
     	this.book = this.sub_book;
     	console.debug(`Tree: Increased level : ${(this.book as Book).title}`);
 	}
 
+	/**
+	 * @abstract The import process is accompanied by the invokation of the IEvent methods.
+	 * 			 Calibre -> Tree
+	 * 
+	 * This one indicates the decrease of the nesting level.
+	 */
 	onDecrease() : void
 	{
     	this.book = (this.book as Book).parent;
@@ -429,6 +553,13 @@ export class Tree implements IBook, IEvents
     	console.debug(`Tree: Decreased level : ${(this.book as Book).title}`);
 	}
 
+	/**
+	 * @abstract The import process is accompanied by the invokation of the IEvent methods.
+	 * 			 Calibre -> Tree
+	 *
+	 * This one indicates the completion of the import and will be used for cleanup tasks.
+	 * For instance the Cleanup mode is implemented. 
+	 */
 	async onStop() : Promise<void>
 	{
     	console.info('Tree.onStop');
@@ -436,7 +567,10 @@ export class Tree implements IBook, IEvents
 		await this.cleanupNotes();
 	}
 	
-	
+	/**
+	 * @abstract Constructor
+	 * 
+	 */
 	constructor()
 	{
 		this.type = Type.Tree;
@@ -445,39 +579,65 @@ export class Tree implements IBook, IEvents
 		this.books = new Array<IBook>();
 	}
 	
+
+	/**
+	 * @abstract Fills the raw Joplin Notebooks with a query for the Base folder
+	 * 
+	 */	
 	async fillRaw() : Promise<void>
 	{
-		this.raw_books = (await joplin.data.get(['folders'])).items;
-		// console.dir(this.raw);
+		this.raw_books = [];
+		
+		for await (const raw_books of joplinServices.allChunks(['folders']))
+		{
+			this.raw_books = this.raw_books.concat(raw_books);
+		}
+		console.debug('fillRaw done');
+		console.dir(this.raw_books);
 	}
 	
-	async prepare() : Promise<void>
-	{
-		this.prepareParents();
-		await this.prepareTree();
-		// console.dir(this);
-	}
-	
+	/**
+	 * @abstract  Transforms the raw data into the final representation
+	 * 
+	 */
 	async prepareTree() : Promise<void>
 	{
-		for (let raw_book of this.raw_books)
-		{
-			const parent_id = raw_book['parent_id'];
-			const parent = this.parents[parent_id];
-			const id = raw_book['id'];
-			// console.dir(raw_book);
-			// console.debug(`ParentId : ${parent_id}`);
+		this.parents[''] = this;										// preparation so that lookup can find top level Notebook's parent
 
-			const book: IBook = await Book.default(parent, raw_book);
-			this.parents[id] = book;
+		let count = 0;
+		let raw_books = this.raw_books;
+		let remaining_books = [];
+		
+		while(raw_books.length > 0)
+		{
+			for (let raw_book of raw_books)
+			{
+				const parent_id = raw_book['parent_id'];
+				const parent = this.parents[parent_id];
+				if (!parent)
+				{
+					console.warn(`prepareTree parent lookup failed for ${raw_book.title}`);
+					remaining_books.push(raw_book);
+					continue;
+				}
+	
+				count ++;
+				const id = raw_book['id'];
+				const book: IBook = await Book.default(parent, raw_book);
+				this.parents[id] = book;
+			}
+			
+			raw_books = remaining_books;
+			remaining_books = []; 
 		}
+		
+		console.info(`prepareTree listed ${count} of ${this.raw_books.length} entries`);
 	}
 	
-	prepareParents() : void
-	{
-		this.parents[''] = this;
-	}
-	
+	/**
+	 * @abstract Performs cleanup tasks. Behavior depends on cleanup mode.
+	 * 
+	 */
 	async cleanupNotes() : Promise<void>
 	{
 		if (await settings.cleanupMode() !== CleanupMode.Cleanup)
@@ -508,7 +668,7 @@ export class Tree implements IBook, IEvents
 	}
 	
 	books: Array<IBook>;
-	raw_books: [{}];
+	raw_books: any[];
 	index: number[];								// for fast access to parents
 	parents: Map<string, IBook>;					// lookup the IBook instance given the parent id
 	type: Type;

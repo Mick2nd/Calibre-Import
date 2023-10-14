@@ -27,7 +27,8 @@ export class Settings
 				public: true,
 				label: 'Activate Attributes',
 				value: true,
-				type: SettingItemType.Bool
+				type: SettingItemType.Bool,
+				description: 'The attributes Markdown-it extension recognizes one-line attributes definitions before other content.'
 			},
 			'genre_field':
 			{
@@ -35,7 +36,8 @@ export class Settings
 				public: true,
 				label: 'Genre Field',
 				value: 'genre',
-				type: SettingItemType.String
+				type: SettingItemType.String,
+				description: 'The name of the Calibre custom field for hierarchical genres.'
 			},
 			'content_field':
 			{
@@ -43,16 +45,26 @@ export class Settings
 				public: true,
 				label: 'Content Field',
 				value: 'content',
-				type: SettingItemType.String
+				type: SettingItemType.String,
+				description: 'The name of the Calibre custom field for additional information. It is Comments like and may be left empty.'
 			},
-			'shrink_genres':
+			'filter_genres':
 			{
 				section: 'CalibreImport.settings',
 				public: true,
-				label: 'Shrink Genres',
+				label: 'Filter Genres',
 				value: '%',
 				type: SettingItemType.String,
-				description: 'Use this field to enter a SQL LIKE string for the Genre field'
+				description: 'Use this field to enter a SQL LIKE string for the Genre field.'
+			},
+			'filter_titles':
+			{
+				section: 'CalibreImport.settings',
+				public: true,
+				label: 'Filter Titles',
+				value: '%',
+				type: SettingItemType.String,
+				description: 'Use this field to enter a SQL LIKE string for the Title field.'
 			},
 			'use_spoilers':
 			{
@@ -60,7 +72,17 @@ export class Settings
 				public: true,
 				label: 'Use Spoilers',
 				value: true,
-				type: SettingItemType.Bool
+				type: SettingItemType.Bool,
+				description: 'The use of the Spoilers extension may be switched off or on.'
+			},
+			'cover_height':
+			{
+				section: 'CalibreImport.settings',
+				public: true,
+				label: 'Cover Height',
+				value: '600px',
+				type: SettingItemType.String,
+				description: 'Used to configure the cover height of the Calibre Ebook Covers.'
 			},
 			'convert_html':
 			{
@@ -68,7 +90,8 @@ export class Settings
 				public: true,
 				label: 'Convert Html',
 				value: true,
-				type: SettingItemType.Bool
+				type: SettingItemType.Bool,
+				description: 'If activated, the content of comments-like fields will be translated from HTML to MD.'
 			},
 			'insert_attributes':
 			{
@@ -77,7 +100,7 @@ export class Settings
 				label: 'Insert Attributes',
 				value: true,
 				type: SettingItemType.Bool,
-				description: 'During the conversion of Html attributes are inserted'
+				description: 'During the conversion of Html attributes are inserted.'
 			},
 			'folder':
 			{
@@ -86,34 +109,37 @@ export class Settings
 				label: 'Library Folder',
 				value: '',
 				type: SettingItemType.String,
-				subType: SettingItemSubType.DirectoryPath
+				subType: SettingItemSubType.DirectoryPath,
+				description: 'The last used Calibre library selection. Reserved for future use.'
 			},
 			'merge_mode':
 			{
 				section: 'CalibreImport.settings',
 				public: true,
 				label: 'Merge Mode',
-				value: 0,
+				value: 1,
 				type: SettingItemType.Int,
 				isEnum: true,
 				options: {
 					0: 'Leave',
-					1: 'Merge (experimental)',
+					1: 'Newest',
 					2: 'Replace'
-				}
+				},
+				description: 'Controls the behavior if a Note is to be overwritten.'
 			},
 			'cleanup_mode':
 			{
 				section: 'CalibreImport.settings',
 				public: true,
 				label: 'Cleanup Mode',
-				value: 0,
+				value: 1,
 				type: SettingItemType.Int,
 				isEnum: true,
 				options: {
 					0: 'Leave',
 					1: 'Cleanup'
-				}
+				},
+				description: 'Controls the behavior for Notes / Notebook deletion after import.'
 			}
 		}
 	}
@@ -155,12 +181,22 @@ export class Settings
 	
 	async shrinkGenres() : Promise<string>
 	{
-		return await joplin.settings.value('shrink_genres');
+		return await joplin.settings.value('filter_genres');
+	}
+	
+	async filterTitles() : Promise<string>
+	{
+		return await joplin.settings.value('filter_titles');
 	}
 	
 	async useSpoilers() : Promise<boolean>
 	{
 		return await joplin.settings.value('use_spoilers');
+	}
+	
+	async coverHeight() : Promise<string>
+	{
+		return await joplin.settings.value('cover_height');
 	}
 	
 	async convertHtml() : Promise<boolean>

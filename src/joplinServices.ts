@@ -238,6 +238,43 @@ class JoplinServices
 		}
 	}
 	
+	/**
+	 * @abstract Asynchronous Iterator through a collection of Joplin data delivering chunks
+	 * 
+	 */
+	async *allChunks(path: string[], options?: any) : AsyncGenerator<[]>
+	{
+		let done = false;
+		let optionsCopy = { };
+		if (options)
+		{
+			optionsCopy = Object.assign({}, options);									// prepare an options shallow copy
+		}
+		
+		for (let page = 1; !done; page++)
+		{
+			optionsCopy['page'] = page;													// prepare page option
+			let raw_books = await joplin.data.get(path, optionsCopy);					// retrieve the page
+			yield await Promise.resolve(raw_books.items);								// yield
+
+			done = ! raw_books.has_more;
+		}
+	}
+	
+	/**
+	 * @abstract Asynchronous Iterator through a collection of Joplin data
+	 * 
+	 */
+	async *all(path: string[], options?: any) : AsyncGenerator
+	{
+		for await(const raw_books of this.allChunks(path, options))
+		{
+			for (const raw_book of raw_books)
+			{
+				yield await Promise.resolve(raw_book);									// yield
+			}
+		}
+	}
 	
 	/**
 		@abstract The get method. Probably we will use the Joplin Api method directly.
