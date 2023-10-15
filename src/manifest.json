@@ -6,8 +6,8 @@
 	"name": "Calibre Import",
 	"description": "Imports a Calibre Db into (Sub-) Notebook",
 	"author": "Jürgen Habelt",
-	"homepage_url": "https://github.com/Mick2nd/Calibre Import#readme",
-	"repository_url": "https://github.com/Mick2nd/Calibre Import",
+	"homepage_url": "https://github.com/Mick2nd/Calibre-Import#readme",
+	"repository_url": "https://github.com/Mick2nd/Calibre-Import",
 	"keywords": [
 		"joplin-plugin",
 	    "import-plugin",

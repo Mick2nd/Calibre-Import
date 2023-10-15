@@ -59,4 +59,45 @@ It follows a generated Note, one version with Spoilers collapsed, the other vers
 Spoilers expanded:
 
 ![A generated note](./doc/Rendered%20MD,%20Spoilers%20Expanded.png)
- 
+
+
+## The Embedded *Attributes* Plug-in
+
+### For What it was Meant
+
+Primarily this content plug-in is to be used by the *Calibre Import*. The import translates *Html* into *MD*
+for consistency reasons. The Html can contain lists with attributes. That's why sometimes attributes are
+required to give a compatible view.
+
+### For What it can be Used
+
+You can equip the following MD constructs with attributes:
+
+1. Lists (level 1 and embedded lists, ordered and unordered)
+1. Paragraphs
+1. Block quotes
+
+What can be done:
+
+1. Equip the generated Html with class names and use those in style definitions
+1. Continue ordered lists with the start attribute
+1. Make the bullets of lists disappear (*list-style-type: none*)
+1. Generally all attributes for the Html tag in question are possible
+
+### Samples
+
+The following MD suppresses bullets in the succeeding list, then a list with start number 10 follows:
+
+```
+///attributes:style=list-style-type:none
+1. Item 1
+2. Item 2
+
+///attributes:start=10
+1. Item 1
+2. Item 2
+```
+
+This gives us the following view:
+
+![Generated view of lists](./doc/Lists%20with%20Attributes.png)

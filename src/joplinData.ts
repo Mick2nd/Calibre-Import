@@ -349,7 +349,7 @@ export class Book extends Node implements IBook2
 	public static async default(parent: IBook, raw: any) : Promise<Book>
 	{
 		const book = new Book(parent, raw);
-		await book.fillNotes();
+		// await book.fillNotes();
 		
 		return book;
 	}
@@ -477,6 +477,7 @@ export class Tree implements IBook, IEvents
 		
 		await tree.fillRaw();
 		await tree.prepareTree();
+		await tree.fillNotes();
 		
 		return tree; 
 	}
@@ -632,6 +633,22 @@ export class Tree implements IBook, IEvents
 		}
 		
 		console.info(`prepareTree listed ${count} of ${this.raw_books.length} entries`);
+	}
+	
+	/**
+	 * @abstract New! Instead of filling the notes immediately this is done now after assembly
+	 * 			 of the Notebook tree. 
+	 * 
+	 */
+	async fillNotes() : Promise<void>
+	{
+		this.folder = await joplin.workspace.selectedFolder();
+		this.book = this.lookupParent(this.folder.id);
+
+		for (const book of forEach(this.book))
+		{
+			await book.fillNotes();
+		}		
 	}
 	
 	/**
