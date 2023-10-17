@@ -1,3 +1,4 @@
+const fs = require('fs-extra');
 const path = require('path');
 const { DataExchangeNs } = require('./dataExchange');
 
@@ -28,7 +29,8 @@ module.exports =
 		/**
 		 *	@abstract The renderIt function
 		 *
-		 *	Will be invoked every time an attributes token is detected
+		 *	Will be invoked every time an attributes token is detected. This modifies succeeding tokens.
+		 *	TODO: improve exception handling
 		 *
 		 */
 		function renderIt(originalStyleRender: any, ...args: any) : any
@@ -78,8 +80,9 @@ module.exports =
 		}
 		
 		/**
-		 * @abstract Tokenizes the attributes in the source
+		 * @abstract Tokenizes the attributes in the source (attributes tokenizer)
 		 * 
+		 *	TODO: improve exception handling
 		 */
 		function tokenizeAttributes(state: any, start: number, end: number, silent: boolean)
 		{
@@ -93,8 +96,6 @@ module.exports =
 			let pos2 = line.search(indicator);
 			if (pos2 !== 0)
 			{
-				/*
-				*/
 				const length = state.tokens.length;															// second algorithm for nested lists
 				if (length > 1)
 				{
@@ -136,27 +137,58 @@ module.exports =
 			return true;
 		}
 		
+		/**
+		 * @abstract Returns the path of the reources folder using current folder as fallback
+		 * 
+		 * @returns resources folder path
+		 */
+		function resourcePath(ruleOptions: any) : string
+		{
+			if (ruleOptions.resourceBaseUrl)
+			{
+				const p = ruleOptions.resourceBaseUrl.substring('file://'.length);
+				return p;
+			}
+			
+			const p = path.resolve('./resources') 													// workaround to get the note printed out (PDF)
+			
+			if (! fs.existsSync(p))
+			{
+				throw new Error(`No resources path found: '${p}'`);
+			} 
+			console.info(`${pluginId} : Here in folder: ${p}`)										// working in developer mode only?
+			return p;									
+		}
 
 		return {
 			/**
-			 * @abstract The real plugin
+			 * @abstract The real plugin hooks into markdown-it at 2 places
+			 * 			 - tokenizeAttributes
+			 * 			 - attributes render (renderIt)
 			 * 
 			 */
 			plugin: function(markdownIt: any, ruleOptions: any)
-			{	
-				
+			{
 				console.dir(ruleOptions);
 				console.info(`${pluginId} : Here in Plugin (INNER) function : ${ruleOptions.resourceBaseUrl}`);
 				
 				markdownIt.block.ruler.before('list', 'attributes', tokenizeAttributes, 
 					{alt: ['list', 'paragraph', 'reference', 'blockquote', 'fence']});
 
-				dataExchange = DataExchangeNs.DataExchange.fromScript(pluginId, ruleOptions.resourceBaseUrl, markdownIt.block.ruler);
+				try
+				{
+					const p = resourcePath(ruleOptions);
+					dataExchange = DataExchangeNs.DataExchange.fromScript(pluginId, p, markdownIt.block.ruler);
+				}
+				catch(e)
+				{
+					console.error(`${e}, settings not working.`);
+				}
 				
 				const attributesRender = markdownIt.renderer.rules.attributes;
 				const originalAttributesRender = attributesRender || defaultAttributesRender;
 
-				markdownIt.renderer.rules.attributes = function(...args: [any]) : any 				/// replacement for ATTRIBUTES rule (if any)
+				markdownIt.renderer.rules.attributes = function(...args: [any]) : any 				// replacement for ATTRIBUTES rule (if any)
 				{						
 					return renderIt(originalAttributesRender, ...args);
 				};

@@ -24,17 +24,29 @@ const import_module = async (ctx: ImportContext) : Promise<void> =>
 			try 
 			{
 				console.info('Executing Import: ' + ctx.sourcePath);
+				
+				const folder = await joplin.workspace.selectedFolder();
+				const confirmation = `This may delete all Notebooks and Notes in the selected Notebook '${folder.title}'. Are you sure?`;
+				if (await joplin.views.dialogs.showMessageBox(confirmation) == 1)
+				{
+					resolve();
+					return;
+				}
 
 				var importer = await Importer.default(ctx.sourcePath);
 				await importer.import_it();
 				
-				console.info('Import successfully completed');
 				resolve(); 
+				const msg = 'Import successfully completed';
+				console.info(msg);
+				await joplin.views.dialogs.showMessageBox(msg);
 			}
 			catch (ex)
 			{
-				console.error('Exception: ' + ex);
 				reject();
+				const msg = `${ex}`;
+				console.error(msg);
+				await joplin.views.dialogs.showMessageBox(msg);
 			}
 			finally
 			{

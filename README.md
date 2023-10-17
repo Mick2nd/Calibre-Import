@@ -50,15 +50,15 @@ The images are partly in German.
 
 The following is a generated Genre tree.
 
-![A generated genre tree](./doc/Genre%20Tree.png)
+![A generated genre tree](./assets/media/Genre%20Tree.png)
 
 It follows a generated Note, one version with Spoilers collapsed, the other version with expanded Spoilers.
 
-![A generated note, spoilers expanded](./doc/Rendered%20MD,%20Spoilers%20Collapsed.png)
+![A generated note, spoilers expanded](./assets/media/Rendered%20MD,%20Spoilers%20Collapsed.png)
 
 Spoilers expanded:
 
-![A generated note](./doc/Rendered%20MD,%20Spoilers%20Expanded.png)
+![A generated note](./assets/media/Rendered%20MD,%20Spoilers%20Expanded.png)
 
 
 ## The Embedded *Attributes* Plug-in
@@ -100,4 +100,20 @@ The following MD suppresses bullets in the succeeding list, then a list with sta
 
 This gives us the following view:
 
-![Generated view of lists](./doc/Lists%20with%20Attributes.png)
+![Generated view of lists](./assets/media/Lists%20with%20Attributes.png)
+ 
+ ## Release Notes
+ 
+ ### 1.0.1
+ 
+ * Error handling was improved 
+ * Documentation was improved
+ * Added *typedoc* to the project including class diagrams
+ * Bug fix: interference with other plug-ins, for instance *Code Section*
+ * Bug fix: notes could not be exported to PDF after installing the plug-in
+ 
+ ### 1.0.0
+ 
+ * The first release
+ 
+ 

@@ -1,10 +1,11 @@
 import joplin from 'api';
 import { Path } from 'api/types';
 import os = require('os');
+import path = require('path');
 const fs = joplin.require('fs-extra');
 
 
-class JoplinServices
+export class JoplinServices
 {
 	constructor()
 	{
@@ -12,7 +13,10 @@ class JoplinServices
 	}
 	
 	/**
-		@abstract Sets the time values for the next post action
+	 * @abstract Sets the time values for the next post action
+	 *
+	 * @param created - created time to be used	
+	 * @param updated - updated time to be used	
 	 */
 	set_time = function(created: string, updated: string) : void
 	{
@@ -27,7 +31,10 @@ class JoplinServices
 
 
 	/**
-		@abstract Puts a folder (notebook) entry into Joplin with a POST request
+	 * @abstract Puts a folder (notebook) entry into Joplin with a POST request
+	 * 
+	 * @param parent_id - id of the parent
+	 * @param title - title of the notebook to be created
 	 */
 	put_folder = async function(parent_id: string, title: string) : Promise<any>
 	{
@@ -37,7 +44,11 @@ class JoplinServices
 
 
 	/**
-		@abstract Puts a Mark-down note into Joplin with a POST request
+	 * @abstract Puts a Mark-down note into Joplin with a POST request
+	 * 
+	 * @param parent_id - id of the parent notebook
+	 * @param title - title of the note
+	 * @param content - the body of the note
 	 */
 	put_note = async function(parent_id: string, title: string, content: string) : Promise<any>
 	{
@@ -47,7 +58,11 @@ class JoplinServices
 
 
 	/**
-		@abstract Puts a resource into Joplin
+	 * @abstract Puts a resource into Joplin. Before POSTing this method tries to acquire a reference
+	 * 			 to an existing resource by using its title.
+	 * 
+	 * @param meta_data - meta data containing the title of the resource
+	 * @param resource_path - the path to an existing resource, image or other file
 	 */
 	put_resource_by_file = async function(meta_data: any, resource_path: string) : Promise<any>
 	{
@@ -67,7 +82,11 @@ class JoplinServices
 
 
 	/**
-		@abstract Puts a resource into Joplin
+	 * @abstract Puts a resource into Joplin. Before POSTing this method tries to acquire a reference
+	 * 			 to an existing resource by using its title.
+	 * 
+	 * @param meta_data - meta data containing the title of the resource
+	 * @param content - the content of the resource as binary array
 	 */
 	put_resource = async function(meta_data: any, content: Uint8Array) : Promise<any>
 	{
@@ -86,7 +105,12 @@ class JoplinServices
 
 
 	/**
-		@abstract Creates a tag and assigns it to the given id's note
+	 * @abstract Creates a tag and assigns it to the given id's note.
+	 * 
+	 * If the tag already exists, this tag will be used.
+	 * 
+	 * @param note_id - the note's id to which the tag is to be ssigned
+	 * @param name - the tag name
 	 */
 	put_tag = async function(note_id: string, name: string) : Promise<any>
 	{
@@ -112,7 +136,9 @@ class JoplinServices
 
 
 	/**
-		@abstract Gets the tag with name with a GET request
+	 * @abstract Gets the tag with name with a GET request by using SEARCH.
+	 * 
+	 * @param name - the tag name to be searched
 	 */
 	get_tag = async function(name: string) : Promise<any>
 	{
@@ -122,8 +148,13 @@ class JoplinServices
 
 
 	/**
-		@abstract POST request for resources
-	*/
+	 * @abstract POST request for resources
+	 * 
+	 * Before posting a temp file will be created because Joplin can only work with files.
+	 * 
+	 * @param meta_data - meta data containing the title
+	 * @param content - the content of the resource as binary array
+	 */
 	post_resource = async function(meta_data: any, content: Uint8Array) : Promise<any>
 	{
 		try
@@ -149,6 +180,8 @@ class JoplinServices
 	/**
 	 * @abstract POSTs a resource file to Joplin
 	 * 
+	 * @param meta_data - meta data containing the title
+	 * @param resource_path - the file system path of an existing resource
 	 */
 	post_resource_by_file = async function(meta_data: any, resource_path: string) : Promise<any>
 	{
@@ -169,7 +202,9 @@ class JoplinServices
 
 	
 	/**
-		@abstract Returns a temp file to be used as resource file
+	 * @abstract Returns a temp file to be used as resource file
+	 * 
+	 * @returns a temp file path located in the os' temp folder
 	 */
 	get_tmp_file = async function() : Promise<string>
 	{

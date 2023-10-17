@@ -2,9 +2,17 @@ import { settings } from "./settings";
 
 var turndown = require('turndown');
 
-
+/**
+ * @abstract A Wrapper for the nodejs turndown module. It adds a rule to the turndown instance for insertion
+ * 			 of attributes to the target markdown.
+ * 
+ */
 export class TurndownServices
 {
+	/**
+	 * @abstract Constructor
+	 * 
+	 */
 	constructor()
 	{
 		this.turndownService = turndown.default();
@@ -14,17 +22,29 @@ export class TurndownServices
 		});
 	}
 	
+	/**
+	 * @abstract Queries the actication setting for attributes rule.
+	 * 
+	 */
 	public async updateSettings() : Promise<TurndownServices>
 	{
 		this.insertAttributes = await settings.insertAttributes();
 		return this;
 	}
 	
+	/**
+	 * @abstract The turndown method
+	 * 
+	 */
 	public turndown(html: string) : string
 	{
 		return this.turndownService.turndown(html);
 	}
 	
+	/**
+	 * @abstract Filter for the list rule
+	 * 
+	 */
 	filter(node: any, options: any) : boolean
 	{
 		if (! this.insertAttributes)
@@ -36,7 +56,7 @@ export class TurndownServices
 			this.skip = false;
 			return false;
 		}
-		if (node.nodeName === 'OL' && node.attributes.length > 0)
+		if ((node.nodeName === 'OL' || node.nodeName === 'UL') && node.attributes.length > 0)
 		{
 			console.debug(`Ordered list with styles: ${node.attributes['style'].nodeValue}`);
 			console.dir(node);
@@ -45,6 +65,10 @@ export class TurndownServices
 		return false;
 	}
 	
+	/**
+	 * @abstract Replacement for the list rule
+	 * 
+	 */
 	replacement(content: string, node: any, options: any) : string
 	{
 		let attributes: any[] = [];

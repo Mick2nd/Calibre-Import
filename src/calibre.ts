@@ -30,7 +30,7 @@ export class Calibre
 			}
 			else
 			{
-				alert('Calibre Db file not found');
+				// alert('Calibre Db file not found');
 				throw new Error('Calibre Db file not found');
 			}
 		}
@@ -46,13 +46,18 @@ export class Calibre
 	 * 			 This is the main method to get data from it to be integrated in the Joplin Notebook
 	 * 
 	 */
-	public Parse = async function() : Promise<any>
+	public parse = async function() : Promise<any>
 	{
 		console.info('Calibre.Parse');
 		await this.parent.onStart(this.library_path);
 
 		const genre = await settings.genreField();
-		const genre_id = (await this.get("SELECT id, label FROM custom_columns WHERE label = ?", [`${genre}`])).id;
+		const genre_row = await this.get("SELECT id, label FROM custom_columns WHERE label = ?", [`${genre}`]);
+		if (! genre_row)
+		{
+			throw new Error(`The custom column ${genre} is configured but not present in the Calibre database`);
+		}
+		const genre_id = genre_row.id;
 		console.info(`Genre field #${genre} has id ${genre_id}`);
 		this.genre_table = `custom_column_${genre_id}`;
 		this.genre_link_table = `books_custom_column_${genre_id}_link`;
@@ -60,7 +65,12 @@ export class Calibre
 		const content = await settings.contentField();
 		if (content !== '')
 		{
-			const content_id = (await this.get("SELECT id, label FROM custom_columns WHERE label = ?", [`${content}`])).id;
+			const content_row = await this.get("SELECT id, label FROM custom_columns WHERE label = ?", [`${content}`]);
+			if (! content_row)
+			{
+				throw new Error(`The custom column ${content} is configured but not present in the Calibre database`);
+			}
+			const content_id = content_row.id;
 			console.info(`Content field #${content} has id ${content_id}`);
 			this.content_table = `custom_column_${content_id}`;
 		}

@@ -643,6 +643,10 @@ export class Tree implements IBook, IEvents
 	async fillNotes() : Promise<void>
 	{
 		this.folder = await joplin.workspace.selectedFolder();
+		if (! this.folder)
+		{
+			throw new Error(`There is no folder selected`);								// according documentation this should not occur
+		}
 		this.book = this.lookupParent(this.folder.id);
 
 		for (const book of forEach(this.book))

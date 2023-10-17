@@ -30,10 +30,9 @@ export namespace DataExchangeNs
 		 * @abstract Instatiates the class from Script
 		 * 
 		 */
-		public static fromScript(pluginId: string, resourceBaseUrl: string, blockRuler: any) : DataExchange
+		public static fromScript(pluginId: string, resourceBaseFolder: string, blockRuler: any) : DataExchange
 		{
-			const resourceBaseDir = resourceBaseUrl.substring('file://'.length);
-			const dataPath = path.join(resourceBaseDir, '..', 'plugin-data', pluginId);
+			const dataPath = path.join(resourceBaseFolder, '..', 'plugin-data', pluginId);
 	
 			let dataExchange = new DataExchange(pluginId, dataPath);
 			

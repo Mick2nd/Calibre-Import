@@ -39,7 +39,7 @@ export class Importer
 	public import_it = async function() : Promise<void>
 	{
 		console.info('Importer.import_it')
-		await this.calibre.Parse();
+		await this.calibre.parse();
 	}
 	
 	calibre: Calibre;
