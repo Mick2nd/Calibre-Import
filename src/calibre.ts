@@ -241,6 +241,15 @@ export class Calibre
 		{
 			book['name'] = data[0]['name'];
 		}
+		
+		const tag_data = await this.all( 														// the tags belonging to the book
+			`SELECT tags.name FROM tags
+			INNER JOIN books_tags_link AS link ON tags.id = link.tag 
+			WHERE link.book = ?`, book['id']
+		);
+		const tags = tag_data.map((data: any) => data['name'].toLowerCase());
+		console.debug(`Tags read: ${tags}`);
+		book['tags'] = tags;
 	}
 
 	

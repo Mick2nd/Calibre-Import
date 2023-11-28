@@ -2,7 +2,7 @@
 	"manifest_version": 1,
 	"id": "de.habelt-jena.CalibreImport",
 	"app_min_version": "2.12",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"name": "Calibre Import",
 	"description": "Imports a Calibre Db into (Sub-) Notebook. Also includes a content plugin supporting attributes (see documentation)",
 	"author": "Jürgen Habelt",
@@ -10,9 +10,12 @@
 	"repository_url": "https://github.com/Mick2nd/Calibre-Import",
 	"keywords": [
 		"joplin-plugin",
-	    "import-plugin",
-	    "calibre-import"
+		"import-plugin",
+		"calibre-import"
 	],
-	"categories": ["files", "appearance"],
+	"categories": [
+		"files",
+		"appearance"
+	],
 	"screenshots": []
 }

@@ -102,9 +102,13 @@ This gives us the following view:
 
 ![Generated view of lists](./assets/media/Lists%20with%20Attributes.png)
  
- ## Release Notes
+## Release Notes
  
- ### 1.0.1
+### 1.0.2
+ 
+ * Added tags to the imported data
+ 
+### 1.0.1
  
  * Error handling was improved 
  * Documentation was improved
@@ -112,7 +116,7 @@ This gives us the following view:
  * Bug fix: interference with other plug-ins, for instance *Code Section*
  * Bug fix: notes could not be exported to PDF after installing the plug-in
  
- ### 1.0.0
+### 1.0.0
  
  * The first release
  

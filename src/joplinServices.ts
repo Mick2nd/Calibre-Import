@@ -5,8 +5,18 @@ import path = require('path');
 const fs = joplin.require('fs-extra');
 
 
+/**
+ * @abstract An encapsulation of the Joplin Data API as neeeded by this app.
+ * 
+ * TODO: Evaluate error return code for better error handling
+ * 
+ */
 export class JoplinServices
 {
+	/**
+	 * @abstract Constructor
+	 * 
+	 */
 	constructor()
 	{
 		
@@ -172,8 +182,8 @@ export class JoplinServices
 		}
 		catch (e)
 		{
-			console.error('Exception in Joplin.post_resource: ' + e);
-			return { id: 'phantasy.pdf', title: title };
+			console.error(`Exception in Joplin.post_resource of '${title}': ${e}`);
+			throw e;
 		}
 	}
 	
@@ -195,7 +205,7 @@ export class JoplinServices
 		}
 		catch (e)
 		{
-			console.error('Exception in Joplin.post_resource: ' + e);
+			console.error(`Exception in Joplin.post_resource of '${title}': ${e}`);
 			throw e;
 		}
 	}
@@ -215,8 +225,11 @@ export class JoplinServices
 
 
 	/**
-		@abstract Gets the resource record(s) (json) with the given title
-	*/
+	 * @abstract Gets the resource record(s) (json) with the given title. The resources are equipped
+	 * 			 with 'id' and 'size' fields
+	 * 
+	 * @param title - the title of a resource
+	 */
 	get_resource = async function(title: string) : Promise<any>
 	{
 		var lst = [];
@@ -240,19 +253,25 @@ export class JoplinServices
 
 	
 	/**
-		@abstract Sends a search to the Data API
-	*/
+	 * @abstract Sends a search to the Data API. Probably this request should be improved to make 
+	 *			 use of the page property.
+	 *
+	 * @param identifier - the identifier of the item(s) to be searched
+	 * @param kind - kind of items (notes, resources..)
+	 * @returns the result of the search
+	 */
 	search = async function(identifier: string, kind: string) : Promise<any>
 	{
 		var query = { query: identifier, type: kind };
-		var response = await this.get(['search'], query);
-		return response['items'];
+		
+		const response = this.get(['search'], query);
+		return (await this.handleError(response, 'search(get)'))['items'];
 	}
 	
 	
 	/**
-		@abstract Method to acquire an access token to the Joplin Data Api
-	*/
+	 *	@abstract Method to acquire an access token to the Joplin Data Api
+	 */
 	acquire_token = async function() : Promise<boolean>
 	{
 		const query = await joplin.data.post(['auth']);
@@ -276,6 +295,11 @@ export class JoplinServices
 	/**
 	 * @abstract Asynchronous Iterator through a collection of Joplin data delivering chunks
 	 * 
+	 * This uses the page and has_more properties to retrieve the whole collection addressed by the 
+	 * request.
+	 * 
+	 * @param path - the Joplin Data path parameter
+	 * @param query - the Joplin Data query parameter (optional)
 	 */
 	async *allChunks(path: string[], options?: any) : AsyncGenerator<[]>
 	{
@@ -289,40 +313,58 @@ export class JoplinServices
 		for (let page = 1; !done; page++)
 		{
 			optionsCopy['page'] = page;													// prepare page option
-			let raw_books = await joplin.data.get(path, optionsCopy);					// retrieve the page
-			yield await Promise.resolve(raw_books.items);								// yield
+			let response = await this.get(path, optionsCopy);							// retrieve the page
+			yield await Promise.resolve(response.items);								// yield
 
-			done = ! raw_books.has_more;
+			done = ! response.has_more;
 		}
 	}
 	
 	/**
 	 * @abstract Asynchronous Iterator through a collection of Joplin data
 	 * 
+	 * This uses the page and has_more properties to retrieve the whole collection addressed by the 
+	 * request.
+	 *
+	 * @param path - the Joplin Data path parameter
+	 * @param query - the Joplin Data query parameter (optional)
 	 */
 	async *all(path: string[], options?: any) : AsyncGenerator
 	{
-		for await(const raw_books of this.allChunks(path, options))
+		for await(const items of this.allChunks(path, options))
 		{
-			for (const raw_book of raw_books)
+			for (const item of items)
 			{
-				yield await Promise.resolve(raw_book);									// yield
+				yield await Promise.resolve(item);										// yield
 			}
 		}
 	}
 	
 	/**
-		@abstract The get method. Probably we will use the Joplin Api method directly.
-	*/
+	 *	@abstract The get method. Probably we will use the Joplin Api method directly.
+	 *
+	 *  This retrieves content from Joplin resource(s)
+	 * 
+	 * 	@param path - the Joplin Data path parameter
+	 * 	@param query - the Joplin Data query parameter (optional)
+	 */
 	get = async function(path: Path, query?: any) : Promise<any>
 	{
-		var response = await joplin.data.get(path, query);
-		return response;
+		const response = joplin.data.get(path, query);
+		return await this.handleError(response, 'get');
 	}
 	
 	/**
-		@abstract The post method. Probably we will use the Joplin Api method directly.
-	*/
+	 *	@abstract The post method. Probably we will use the Joplin Api method directly.
+	 *
+	 *  This sends content of new resource(s). If the method addresses a single Note, the body
+	 *  data is supplemented by the creation und updated times.
+	 *
+	 * 	@param path - the Joplin Data path parameter
+	 * 	@param query - the Joplin Data query parameter (optional)
+	 *  @param body - the Joplin Data body parameter (optional) 
+	 *  @param files - the Joplin Data files parameter (optional) 
+	 */
 	post = async function(path: Path, query?: any, body?: any, files?: any[]) : Promise<any>
 	{
 		if (path.length == 1 && body)
@@ -331,13 +373,20 @@ export class JoplinServices
 			body['user_updated_time'] = this.updated;
 		}
 		
-		var response = await joplin.data.post(path, query, body, files);
-
-		return response;
+		const response = joplin.data.post(path, query, body, files);
+		return await this.handleError(response, 'post');
 	}
 	
 	/**
-		@abstract The put method. Probably we will use the Joplin Api method directly.
+	 *	@abstract The put method updates content of existing resource(s).
+	 *
+	 *  If the method addresses a single Note, the body data is supplemented by the creation und updated
+	 *  times.
+	 *
+	 * 	@param path - the Joplin Data path parameter
+	 * 	@param query - the Joplin Data query parameter (optional)
+	 *  @param body - the Joplin Data body parameter (optional) 
+	 *  @param files - the Joplin Data files parameter (optional) 
 	*/
 	put = async function(path: Path, query?: any, body?: any, files?: any[]) : Promise<any>
 	{
@@ -347,17 +396,40 @@ export class JoplinServices
 			body['user_updated_time'] = this.updated;
 		}
 		
-		var response = await joplin.data.put(path, query, body, files);
-
-		return response;
+		const response = joplin.data.put(path, query, body, files);
+		return await this.handleError(response, 'put');
 	}
 	
 	/**
 	 *	@abstract The delete method. Probably we will use the Joplin Api method directly.
+	 *
+	 * 	@param path - the Joplin Data path parameter
+	 * 	@param query - the Joplin Data query parameter (optional)
 	 */
 	delete = async function(path: Path, query?: any) : Promise<void>
 	{
-		await joplin.data.delete(path, query);
+		const response = joplin.data.delete(path, query);
+		await this.handleError(response, 'delete');
+	}
+	
+	/**
+	 * @abstract Can be used to handle error from Joplin Data API. Throws if response contains
+	 * 			 error info, otherwise returns the response parameter.
+	 * 
+	 * @param resp - the reponse to check for errors (a Promise)
+	 * @param api - the api that caused the error
+	 * @returns the method parameter
+	 * @throws throws on error response
+	 */
+	async handleError(resp: Promise<any>, api: string) : Promise<any>
+	{
+		const resp2 = await resp;
+		if (resp2 && resp2.hasOwnProperty('error'))
+		{
+			throw new Error(`Error in Jopli Data request ${api} '${resp2.error}'`);
+		}
+		
+		return resp2;
 	}
 	
 	created: number = new Date().valueOf();

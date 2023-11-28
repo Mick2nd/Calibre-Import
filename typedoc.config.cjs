@@ -1,14 +1,15 @@
-{
+/** @type {import('typedoc').TypeDocOptions} */
+module.exports = {
 	"$schema": "https://typedoc.org/schema.json",
 	"entryPoints": ["src", "assets", "README.md"],
 	"entryPointStrategy": "expand",
 	"out": "docs",
-	"cleanOutputDir": false,
+	"cleanOutputDir": true,
 	
 	"name": "Calibre Import",
 	"theme": "default", 
 	"basePath": ".",
-	"skipErrorChecking": true,
+	"skipErrorChecking": () => true,
     "plugin": ["typedoc-umlclass"],
     "umlClassDiagram": 
     {
@@ -16,4 +17,4 @@
         "location": "local",
         "format": "svg"
     }
-}
+};

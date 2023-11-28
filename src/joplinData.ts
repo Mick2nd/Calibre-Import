@@ -188,16 +188,39 @@ export class Note extends Node
 
 		if (this.id === '')																		// this Note is new, does not have an id yet
 		{
-			const id = await joplinServices.put_note(this.parent_id, title, md);				// puts the md note into notebook
-			this.id = id;
+			const response = await joplinServices.put_note(this.parent_id, title, md);			// puts the md note into notebook
+			this.id = response.id;
 		}
 		else																					// existing -> replace body and time
 		{
 			await joplinServices.put(['notes', this.id], null, { 'body': this.body });			// replace
 		}
+		this.updateTags(ebook);
 
 		return this;
 	}
+	
+	/**
+	 * @abstract Updates the tags of a given Note. New tags are taken from Calibre ebook, old tags are
+	 * 			 deleted from Joplin.
+	 * 
+	 */
+	public async updateTags(ebook: any) : Promise<void>
+	{
+		const remove = this.tags.filter((tag: string) => ! ebook['tags'].includes(tag));		// tags are to be removed (not in Calibre tag set)
+		const add = ebook['tags'].filter((tag: string) => ! this.tags.includes(tag));			// tags are to be added (not already in Joplin tag set)
+		for (const tag of add)
+		{
+			await joplinServices.put_tag(this.id, tag);
+		}
+		for (const tag of remove)
+		{
+			const tagid = (await joplinServices.get_tag(tag))[0].id;							// need an id !!
+			await joplinServices.delete(['tags', tagid, 'notes', this.id]);
+		}
+		this.tags = ebook['tags']; 
+	}
+	
 	
 	/**
 	 * @abstract Import operation if status is Merge, e.g. Note is already present in Joplin
@@ -240,6 +263,7 @@ export class Note extends Node
 		super(parent, raw);
 		this.type = Type.Note;
 		this.status = Status.Present;
+		this.tags = new Array<string>();
 		
 		this.body = raw['body'];
 		if (raw['user_created_time'])													// raw comes from Joplin API
@@ -330,6 +354,7 @@ ${content}
 	body: string;
 	created: string = new Date().toUTCString();
 	updated: string = new Date().toUTCString();
+	tags: string[];
 }
 
 
@@ -383,7 +408,9 @@ export class Book extends Node implements IBook2
 			{ fields: Note.requiredFields }
 		))
 		{
-			const note = new Note(this, raw_note);										// appends Note to parents books array 
+			const note = new Note(this, raw_note);										// appends Note to parent's notes array 
+			const response = await joplinServices.get(['notes', note.id, 'tags']);		// returns all the tags of this note
+			note.tags = response.items.map((tag: any) => tag.title);
 		}
 		console.dir(this);
 	}
