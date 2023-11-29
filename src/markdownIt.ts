@@ -24,6 +24,16 @@ module.exports =
 			console.info(`${pluginId} : Here in Plugin (defaultAttributesRender) function`);
 			return self.renderToken(tokens, idx, options, env, self);
 		};
+		
+		/**
+		 *	This is a default fence renderer
+		 *	It will be invoked, if no other fence renderer can be acquired (according to demo code) 
+		 */
+		const defaultFenceRender = function(tokens: any, idx: any, options: any, env: any, self: any) : any 
+		{
+			console.info(`${pluginId} : Here in Plugin (defaultFenceRender) function`);
+			return self.renderToken(tokens, idx, options, env, self);
+		};
 
 
 		/**
@@ -49,12 +59,23 @@ module.exports =
 				try
 				{
 					let attrs = token.attrs;
-					let nextToken = tokens[idx + 1];
-					console.debug(`${pluginId} : ${nextToken.type}`);
-					if (['bullet_list_open', 'ordered_list_open', 'paragraph_open', 
-						'blockquote_open', 'fence'].includes(nextToken.type))						// TODO: supplement
+					let nextIdx = idx + 1;
+					if (nextIdx >= tokens.length)
 					{
-						nextToken.attrs = attrs;
+						return '';
+					}
+					let nextToken = tokens[nextIdx];
+					nextIdx ++;
+					
+					console.debug(`${pluginId}, next token type : ${nextToken.type}`);
+					if (['bullet_list_open', 'ordered_list_open', 'paragraph_open', 
+						'blockquote_open', 'heading_open', 'table_open', 'hr', 'fence']
+						.includes(nextToken.type))													// TODO: supplement
+					{
+						for (const attr of attrs)
+						{
+							nextToken.attrPush(attr);
+						}
 					}
 					return '';																		// no own output !
 				}
@@ -70,13 +91,67 @@ module.exports =
 		}
 		
 		/**
-		 * @abstract Provides attributes from a attributes token to the next token
+		 * @abstract The renderItFence hook
+		 * 
+		 */
+		function renderItFence(originalFenceRender: any, ...args: any) : any
+		{
+			let tokens = args[0], 
+				idx = args[1], 
+				options = args[2], 
+				env = args[3], 
+				renderer = args[4];
+			
+			let token = tokens[idx];
+			
+			let result = originalFenceRender(...args);
+			result = transferAttributes(token.attrs, result);
+			
+			return result;
+		}
+		
+		/**
+		 * @abstract Taking the attributes of a fence token, this function sets the attributes of the
+		 *           rendered <pre> html tag.
+		 */
+		function transferAttributes(attrs: any, content: string) : string
+		{
+			let attrString = '';
+			if (attrs)
+			{
+				attrString = attrs.map(function(attr: any)
+					{
+						if (attr[0] !== 'class')
+						{
+							return `${attr[0]}="${attr[1]}"`;
+						}
+						else
+						{
+							return `${attr[0]}="hljs ${attr[1]}"`;
+						} 
+					}).join(' ');
+			}
+				
+			return content.replace(
+				/class="hljs"/smg,
+				(match: string, offset: any, whole: any) =>
+				{ 
+					return attrString;
+				}
+			);
+		}
+		
+		/**
+		 * @abstract Provides attributes from an attributes token to the next token
 		 * 
 		 */
 		function addAttributes(token: any, content: string)
 		{
 			let attrs = content.substring(content.search(':') + 1);
-			token.attrs = attrs.split(',').map((asn: string) => asn.split('='));
+			for (const attr of attrs.split(','))
+			{
+				token.attrJoin(...attr.trim().split('='));
+			}
 		}
 		
 		/**
@@ -124,13 +199,10 @@ module.exports =
 				return true;
 			}
 
-			console.debug(`${pluginId} : Token detected`);
+			console.debug(`${pluginId} : Token detected : ${line}`);
 			let token = state.push('attributes', 'div', 0);
 			token.info = line;
 			addAttributes(token, line);
-
-		    // We use to render markdown within
-		    // state.md.block.tokenize(state, curLine + 1, end, false);
 
 			state.line ++;			
 			
@@ -191,6 +263,14 @@ module.exports =
 				markdownIt.renderer.rules.attributes = function(...args: [any]) : any 				// replacement for ATTRIBUTES rule (if any)
 				{						
 					return renderIt(originalAttributesRender, ...args);
+				};
+
+				const fenceRender = markdownIt.renderer.rules.fence;
+				const originalFenceRender = fenceRender || defaultFenceRender;
+
+				markdownIt.renderer.rules.fence = function(...arguments: any) : any 				// replacement for FENCE rule
+				{						
+					return renderItFence(originalFenceRender, ...arguments);
 				};
 			},
 			

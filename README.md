@@ -73,13 +73,28 @@ required to give a compatible view.
 
 You can equip the following MD constructs with attributes:
 
-1. Lists (level 1 and embedded lists, ordered and unordered)
+<a name="scope"></a>
+
+1. Lists (level 1 and embedded lists, ordered and unordered and task lists)
 1. Paragraphs
 1. Block quotes
+1. Headings
+1. Tables
+1. Horizontal Rulers
+1. Code Fences. The surrounding `<span>` tag is equipped with attributes.
+1. Images and Links. The surrounding `<p>` tag (paragraph) is equipped with attributes.
+   To equip a link with styles, you can, for instance, use the following construct:
+
+   ```text
+   ///attributes:id=link
+   [Web](https://google.com)
+   ...
+   #link a { background-color: yellow; }
+   ```
 
 What can be done:
 
-1. Equip the generated Html with class names and use those in style definitions
+1. Equip the generated Html with class names or ids and use those in style definitions
 1. Continue ordered lists with the start attribute
 1. Make the bullets of lists disappear (*list-style-type: none*)
 1. Generally all attributes for the Html tag in question are possible
@@ -88,7 +103,7 @@ What can be done:
 
 The following MD suppresses bullets in the succeeding list, then a list with start number 10 follows:
 
-```
+```text
 ///attributes:style=list-style-type:none
 1. Item 1
 2. Item 2
@@ -101,23 +116,31 @@ The following MD suppresses bullets in the succeeding list, then a list with sta
 This gives us the following view:
 
 ![Generated view of lists](./assets/media/Lists%20with%20Attributes.png)
- 
+
 ## Release Notes
- 
+
+### 1.0.3
+
+The scope of the *attributes* content plug-in was extended by ([see above](#scope)):
+
+* headings
+* tables
+* horizontal rulers
+* code fences
+* images and links
+
 ### 1.0.2
- 
- * Added tags to the imported data
- 
+
+* Added tags to the imported data
+
 ### 1.0.1
- 
- * Error handling was improved 
- * Documentation was improved
- * Added *typedoc* to the project including class diagrams
- * Bug fix: interference with other plug-ins, for instance *Code Section*
- * Bug fix: notes could not be exported to PDF after installing the plug-in
- 
+
+* Error handling was improved
+* Documentation was improved
+* Added *typedoc* to the project including class diagrams
+* Bug fix: interference with other plug-ins, for instance *Code Section*
+* Bug fix: notes could not be exported to PDF after installing the plug-in
+
 ### 1.0.0
- 
- * The first release
- 
- 
+
+* The first release
