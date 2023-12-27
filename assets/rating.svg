@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<svg class="rating" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200px" viewBox="0 0 1000 200">
+	
+	<style><![CDATA[
+		.rating {
+			background-color: grey;
+		}
+		#stars {
+			fill: lime;
+		}
+		#grey-stars {
+			fill: grey;
+		}
+		#background {
+			fill: cyan;
+		}
+		#rating {
+			transform: scale(.3, 1);
+		}
+		]]>
+	</style>
+
+	<defs>
+		<ref id="test" param="test" default="lime" />
+		<ref id="rating" param="rating" default="scale(.55 1)" />
+		<ref id="rating2" param="rating2" default="scale(.55 1)" />
+		
+		<polygon id="raw-star" points="100,10 40,198 190,78 10,78 160,198" />
+		
+		<g id="star" y="0">
+			<use href="#raw-star" />
+		</g>
+		<g id="raw-stars">
+			<use href="#star" x="0" />
+			<use href="#star" x="200" />
+			<use href="#star" x="400" />
+			<use href="#star" x="600" />
+			<use href="#star" x="800" />
+		</g>
+
+		<clipPath id="clip" >
+			<rect id="rating" x="0" y="0" width="100%" height="100%" transform="url(#rating)" test="scale(.3, 1)" />
+		</clipPath>
+		
+	</defs>
+
+	<rect id="background" width="100%" height="100%" />
+	<use id="grey-stars" href="#raw-stars" x="0" y="0" />
+	<use id="stars" href="#raw-stars" x="0" y="0" clip-path="url(#clip)" />
+	
+	<script type="text/ecmascript" href="https://dev.w3.org/SVG/modules/ref/master/ref2.js"></script>
+
+</svg>

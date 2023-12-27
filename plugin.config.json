@@ -1,5 +1,6 @@
 {
 	"extraScripts": [
-		"markdownIt.ts"
+		"markdownIt.ts",
+		"assets/rating.ts"
 	]
 }

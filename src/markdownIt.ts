@@ -1,6 +1,4 @@
-const fs = require('fs-extra');
-const path = require('path');
-const { DataExchangeNs } = require('./dataExchange');
+import { Settings } from "./settings";
 
 
 module.exports = 
@@ -9,7 +7,6 @@ module.exports =
 	{
 		const pluginId = context.pluginId;
 		const indicator = '///attributes';
-		let dataExchange = undefined;
 		
 		console.dir(context);
 		console.info(`${pluginId} : Here in Plugin default (OUTER) function`);
@@ -103,6 +100,11 @@ module.exports =
 				renderer = args[4];
 			
 			let token = tokens[idx];
+			
+			if (token.info == 'purehtml')
+			{
+				return token.content;
+			}
 			
 			let result = originalFenceRender(...args);
 			result = transferAttributes(token.attrs, result);
@@ -209,27 +211,26 @@ module.exports =
 			return true;
 		}
 		
+		let settings = null;
+
 		/**
-		 * @abstract Returns the path of the reources folder using current folder as fallback
-		 * 
-		 * @returns resources folder path
-		 */
-		function resourcePath(ruleOptions: any) : string
+		 * @abstract Listens for and handles changes of the 'activate_attributes' setting
+		 * 			 It seems the event mechanism has no action, only the direct invocation 
+		 * 			 does work
+		 */		
+		function signalListener(blockRuler: any, activate_attributes: Boolean) : void
 		{
-			if (ruleOptions.resourceBaseUrl)
+			console.debug(`${pluginId} : Read settings : ${activate_attributes}`);
+			if (! activate_attributes)
 			{
-				const p = ruleOptions.resourceBaseUrl.substring('file://'.length);
-				return p;
+			  	console.debug(`${pluginId} : Disabled attributes`);
+				blockRuler.disable(['attributes'], true);
 			}
-			
-			const p = path.resolve('./resources') 													// workaround to get the note printed out (PDF)
-			
-			if (! fs.existsSync(p))
+			else
 			{
-				throw new Error(`No resources path found: '${p}'`);
-			} 
-			console.info(`${pluginId} : Here in folder: ${p}`)										// working in developer mode only?
-			return p;									
+			  	console.debug(`${pluginId} : Enabled attributes`);
+				blockRuler.enable(['attributes'], true);
+			}
 		}
 
 		return {
@@ -237,7 +238,7 @@ module.exports =
 			 * @abstract The real plugin hooks into markdown-it at 2 places
 			 * 			 - tokenizeAttributes
 			 * 			 - attributes render (renderIt)
-			 * 
+			 *           - fence render (renderItFence)
 			 */
 			plugin: function(markdownIt: any, ruleOptions: any)
 			{
@@ -249,8 +250,10 @@ module.exports =
 
 				try
 				{
-					const p = resourcePath(ruleOptions);
-					dataExchange = DataExchangeNs.DataExchange.fromScript(pluginId, p, markdownIt.block.ruler);
+					const listener = signalListener.bind(this, markdownIt.block.ruler);
+					settings = new Settings(ruleOptions, listener);
+					const activateAttributes = settings.activateAttributesSync();
+					listener(activateAttributes);
 				}
 				catch(e)
 				{
@@ -268,15 +271,25 @@ module.exports =
 				const fenceRender = markdownIt.renderer.rules.fence;
 				const originalFenceRender = fenceRender || defaultFenceRender;
 
-				markdownIt.renderer.rules.fence = function(...arguments: any) : any 				// replacement for FENCE rule
+				markdownIt.renderer.rules.fence = function(...args: any) : any 						// replacement for FENCE rule
 				{						
-					return renderItFence(originalFenceRender, ...arguments);
+					return renderItFence(originalFenceRender, ...args);
 				};
 			},
 			
 			assets: function() : any {
 				return [
-					// { name: 'markdownIt.css' }
+					{
+						inline: true,
+						text: '.meta td { background-color: blue; }',
+						mime: 'text/css',
+					},
+					{ name: 'markdownIt.css' },
+					{ name: 'assets/rating-html.css' },
+					{ name: 'assets/rating.css' },
+					{ name: 'assets/rating.svg' },
+					{ name: 'assets/pre-process.js' },
+					{ name: 'assets/rating.js' }
 				];
 			},
 		}

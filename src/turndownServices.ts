@@ -16,9 +16,25 @@ export class TurndownServices
 	constructor()
 	{
 		this.turndownService = turndown.default();
+
+		var turndownPluginGfm = require('joplin-turndown-plugin-gfm')
+
+		// Use the gfm plugin
+		var gfm = turndownPluginGfm.gfm
+		this.turndownService.use(gfm)
+
+		// Use the table and strikethrough plugins only
+		var tables = turndownPluginGfm.tables
+		var strikethrough = turndownPluginGfm.strikethrough
+		this.turndownService.use([tables, strikethrough])		
+		
 		this.turndownService.addRule('list', {
-			filter: (node: any, options: any) => this.filter(node, options),
-			replacement: (content: string, node: any, options: any) => this.replacement(content, node, options)
+			filter: (node: any, options: any) => this.listFilter(node, options),
+			replacement: (content: string, node: any, options: any) => this.listReplacement(content, node, options)
+		});
+		this.turndownService.addRule('table', {
+			filter: (node: any, options: any) => this.tableFilter(node, options),
+			replacement: (content: string, node: any, options: any) => this.tableReplacement(content, node, options)
 		});
 	}
 	
@@ -42,10 +58,105 @@ export class TurndownServices
 	}
 	
 	/**
+	 * @abstract Tables without head or tables with alignment need extra handling
+	 * 
+	 */
+	tableFilter(node: any, options: any) : boolean
+	{
+		if (this.skipTable)
+		{
+			this.skipTable = false;
+			return false;
+		}
+		if (node.nodeName === 'TABLE')
+		{
+			console.dir(node);
+			if (node.firstElementChild.nodeName !== 'THEAD')				// TODO: remove
+			// if(! node.innerHTML.toLowerCase().includes('thead'))
+			{
+				return true;												// requires extra handling
+			}
+		}
+		
+		return false;
+	}
+	
+	
+	tableReplacement(content: string, node: any, options: any) : string
+	{
+		this.skipTable = true;
+		const align = this.inspectTable(node);
+		console.debug(`Alignment: ${align}`);
+		let table = this.turndown(node.outerHTML);
+		// table = table.substring(table.indexOf('\n') + 1);
+		table = this.applyAlign(table, align);
+		return table;
+	}
+	
+	
+	inspectTable(node: any) : any
+	{
+		let alignment = [];
+		console.assert(node.nodeName === 'TABLE');
+
+		const tr = node.firstElementChild.firstElementChild;
+		console.assert(tr.nodeName === 'TR');
+		for (const td of tr.childNodes)
+		{
+			console.assert(td.nodeName === 'TD');
+			let p = td;
+			if (td.firstElementChild !== undefined)
+			{
+				p = td.firstElementChild;
+			}
+			
+			if (p.attributes.align !== undefined)
+			{
+				alignment.push(p.attributes.align.nodeValue);
+			}
+			else
+			{
+				alignment.push('left');
+			}
+		}
+		
+		return alignment;
+	}
+	
+	applyAlign(table: string, align: []) : string
+	{
+		let rows = table.split('\n');
+		for (let r = 0; r < rows.length; r++)
+		{
+			let columns = rows[r].split('|');
+			for (let c = 1; c < columns.length; c++)
+			{
+				columns[c] = columns[c].trim();
+			
+				if (r === 1)
+				{
+					if (align[c - 1] === 'left')
+					{
+						columns[c] = ':' + columns[c];
+					} 
+					if (align[c - 1] === 'right')
+					{
+						columns[c] = columns[c] + ':';
+					} 
+				}
+			}
+			rows[r] = columns.join('|');
+		}
+		
+		return rows.join('\n');
+	}
+	
+	
+	/**
 	 * @abstract Filter for the list rule
 	 * 
 	 */
-	filter(node: any, options: any) : boolean
+	listFilter(node: any, options: any) : boolean
 	{
 		if (! this.insertAttributes)
 		{
@@ -69,7 +180,7 @@ export class TurndownServices
 	 * @abstract Replacement for the list rule
 	 * 
 	 */
-	replacement(content: string, node: any, options: any) : string
+	listReplacement(content: string, node: any, options: any) : string
 	{
 		let attributes: any[] = [];
 		for (const attr of node.attributes)
@@ -85,6 +196,7 @@ export class TurndownServices
 	
 	turndownService: any;
 	skip: boolean = false;
+	skipTable: boolean = false;
 	insertAttributes:boolean = true;
 }
 

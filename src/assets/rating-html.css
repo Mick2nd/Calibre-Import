@@ -1,0 +1,14 @@
+
+.bg {  
+	background-image: url("rating.svg");
+	background-repeat: no-repeat;
+	background-size: contain;
+	color: transparent;
+}
+
+.bg-empty {
+	background-repeat: no-repeat;
+	background-size: contain;
+	color: transparent;
+}
+

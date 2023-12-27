@@ -22,7 +22,6 @@ export namespace DataExchangeNs
 		{
 			this.pluginId = pluginId;
 			this.dataPath = dataPath;
-			this.watchPath = path.join(dataPath, '*');
 			this.prepareStorage();
 		}
 		
@@ -30,15 +29,12 @@ export namespace DataExchangeNs
 		 * @abstract Instatiates the class from Script
 		 * 
 		 */
-		public static fromScript(pluginId: string, resourceBaseFolder: string, blockRuler: any) : DataExchange
+		public static fromScript(pluginId: string, dataPath: string, signalListener: Function) : DataExchange
 		{
-			const dataPath = path.join(resourceBaseFolder, '..', 'plugin-data', pluginId);
-	
 			let dataExchange = new DataExchange(pluginId, dataPath);
 			
-			dataExchange.blockRuler = blockRuler; 										// only needed in Script
+			dataExchange.signalListener = signalListener; 								// only needed in Script
 			dataExchange.prepareWatcher();
-			dataExchange.onSettingChanged();											// initial invokation
 			
 			return dataExchange;
 		}
@@ -59,7 +55,6 @@ export namespace DataExchangeNs
 		/**
 		 * @abstract Writes settings to persisted storage, meant for data exchange with the 
 		 * 			 MarkdownIt script. Invoked by Plugin onChanged - handler.
-		 * 
 		 */
 		public async ChangeSetting(key: string, val: any) : Promise<void>
 		{
@@ -71,7 +66,6 @@ export namespace DataExchangeNs
 		
 		/**
 		 * @abstract Prepares the storage
-		 * 
 		 */
 		prepareStorage() : void
 		{
@@ -81,42 +75,24 @@ export namespace DataExchangeNs
 		
 		/**
 		 * @abstract Watch storage directory
-		 * 
 		 */ 
 		prepareWatcher() : void
 		{
+			this.watchPath = path.join(this.dataPath, '*');
 			this.watcher = chokidar.watch(this.watchPath, { persistent: true })
 			this.watcher.on('all', (event: string, path: any) => 
 			{
-			  	console.log(`${this.pluginId} : Configuration changed : ${event}, ${path}`);
-				this.onSettingChanged();
+			  	console.log(`${this.pluginId} : Signal arrived : ${event}, ${path}`);
+			  	const signal = this.storage.getItemSync('signal');
+			  	this.signalListener(signal);
+				// this.onSettingChanged();
 			});			
-		}
-		
-		/**
-		 * @abstract Handler of data changes monitored with watcher
-		 * 
-		 */
-		onSettingChanged() : void
-		{
-			const activate_attributes = this.storage.getItemSync('activate_attributes');			  	
-			console.debug(`${this.pluginId} : Read settings : ${activate_attributes}`)
-			if (! activate_attributes)
-			{
-			  	console.debug(`${this.pluginId} : Disabled attributes`);
-				this.blockRuler.disable(['attributes'], true);
-			}
-			else
-			{
-			  	console.debug(`${this.pluginId} : Enabled attributes`);
-				this.blockRuler.enable(['attributes'], true);
-			}
 		}
 		
 		pluginId: string = '';
 		dataPath: string;
 		watchPath: string;
-		blockRuler: any;
+		signalListener: Function;
 		storage: any;
 		watcher: any;
 		supported: [string];

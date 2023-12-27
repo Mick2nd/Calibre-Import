@@ -3,6 +3,7 @@ import path = require('path');
 import { IEvents } from './events';
 import { joplinServices } from './joplinServices';
 import { CleanupMode, MergeMode, settings } from './settings';
+const fs = joplin.require('fs-extra');
 
 
 /**
@@ -164,23 +165,48 @@ export class Note extends Node
 		if (has_cover)
 		{
 			const cover_path = path.join(library_path, book_path, 'cover.jpg');
-			const metadata = { title: title };
-			const resp = await joplinServices.put_resource_by_file(metadata, cover_path);
-			md += `![${title}](:/${resp["id"]})\n`;												// adds a cover if present
+			if (fs.existsSync(cover_path))
+			{
+				const metadata = { title: title };
+				const resp = await joplinServices.put_resource_by_file(metadata, cover_path);
+				md += `![${title}](:/${resp["id"]})\n`;											// adds a cover if present
+			}
 		}
 		else
 		{
 			md += 'No Cover\n';
 		}
+		md += await this.attributes('class=meta');
 		md += `|||\n|-|-|\n`;																	// table header (invisible)
 		md += `${this.formats(library_path, ebook)}\n`;											// adds the formats as table line
-		md += `|Authors:|${ebook['author_sort']}|`;
+		md += `|Authors:|${ebook['author_sort']}|\n`;
+		md += `|Series:|${ebook['series']}|\n`;
+		
+		for (const entries of ebook.cc_simple)													// add simple custom columns
+		{
+			for (const [idx, entry] of entries[1].entries())
+			{
+				if (idx == 0)
+				{
+					md += `|${entries[0]}:|${entry}|\n`;
+				}
+				else
+				{
+					md += `| |${entry}|\n`;				
+				}
+			} 
+		}
 		
 		md += await this.spoiler('Comments', ebook['comments']);								// adds the comments spoiler section
 		const content = ebook['content'];
 		if (content != undefined)
 		{
 			md += await this.spoiler('Content', content);										// adds the content spoiler section
+		}
+		
+		for (const entry of ebook.cc_comments)													// add custom columns with comments-like content
+		{
+			md += await this.spoiler(entry[0], entry[1]);
 		}
 		
 		this.body = md;
@@ -343,12 +369,25 @@ ${content}
 		return `
 <style>
 	img { height: ${await settings.coverHeight()}; }
-	table { border-style: hidden; border-collapse: collapse; }
-	thead { display: none; }
+	table { border-style: hidden; border-collapse: collapse; width: 100%; }
 	td { font-size: small; }
-	td:nth-child(odd) { font-style: Italic }
+	td strong { font-size: large; font-weight: 600; }
+	.meta td:nth-child(odd) { font-style: Italic }
 </style>
 `;
+	}
+
+	/**
+	 * @abstract Returns an attribute line or empty string depending on setting.
+	 * 
+	 */	
+	async attributes(attrs: string) : Promise<string>
+	{
+		if (await settings.insertAttributes())
+		{
+			return `///attributes:${attrs}\n`;
+		}
+		return '';
 	}
 	
 	body: string;

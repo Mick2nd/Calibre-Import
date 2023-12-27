@@ -1,22 +1,21 @@
 import joplin from 'api';
 import { ImportContext, FileSystemItem, ContentScriptType } from 'api/types';
 import { Importer } from './importer';
-import { DataExchangeNs } from './dataExchange';
 // require('source-map-support').install();
 
 import { settings } from './settings';
 
 
 /**
-	@abstract Function or lambda to execute import command
-	
-	This is the real import module integrated in Import sub menu. It will be invoked by the Joplin
-	framework, if a Calibre Sqlite Db is chosen.
+ *	@abstract Function or lambda to execute import command
+ *	
+ *	This is the real import module integrated in Import sub menu. It will be invoked by the Joplin
+ *	framework, if a Calibre Sqlite Db is chosen.
  */
 const import_module = async (ctx: ImportContext) : Promise<void> =>
 {
 	console.info('Just before returning Promise: ' + JSON.stringify(ctx));
-	joplin.settings.setValue('folder', ctx.sourcePath);
+	joplin.settings.setValue('library_folder', ctx.sourcePath);
 
 	return new Promise(
 		async function(resolve, reject) 
@@ -55,41 +54,15 @@ const import_module = async (ctx: ImportContext) : Promise<void> =>
 		});
 }
 
-/**
- * @abstract Needed global instance for Data Exchange
- * 
- */
-let dataExchange: any;
 
 /**
- * @abstract Writes settings to persisted storage, meant for data exchange with the 
- * 			 MarkdownIt script.
- * 
- */
-const onChange = async function(event: { keys: [string] }) : Promise<void>
-{
-	console.info(`onChange triggered: ${event.keys}`);
-	for (const key of event.keys)
-	{
-		const val = await joplin.settings.value(key);
-		await dataExchange.ChangeSetting(key, val); 
-	}
-}
-
-
-/**
-	@abstract Function to Setup the plugin
+ *	@abstract Function to Setup the plugin
  */
 async function setupPlugin()
 {
 	const id = 'de.habelt-jena.CalibreImport';
 	
-	await settings.register();
-	
-	const dataDir = await joplin.plugins.dataDir();
-	dataExchange = DataExchangeNs.DataExchange.fromPlugin(id, dataDir, ['activate_attributes']);
-	
-	await joplin.settings.onChange(onChange);
+	await settings.register(id);
 	
 	await joplin.interop.registerImportModule(
 		{
@@ -106,17 +79,11 @@ async function setupPlugin()
 		`${id}`,														// concatenate id with resources dir -> simpler way
 		'./markdownIt.js'
 	);
-	
-	/*	TEST CODE
-	 *
-	 */
-	// await Joplin.default(null);
-	// const tree = await Tree.default();
 };
 
 
 /**
-	@abstract Registers the setup function
+ *	@abstract Registers the setup function
  */
 joplin.plugins.register({
 	onStart: async function() 

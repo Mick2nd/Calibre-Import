@@ -5,40 +5,24 @@ const fs = joplin.require('fs-extra');
 import { IEvents } from './events';
 import { settings } from './settings';
 import { turndownServices } from './turndownServices';
+import { CalibreServices } from './calibreServices';
+import { appendFileSync } from 'fs';
 
 
 /**
  * @abstract This class provides an interface to extract information from a Calibre database
  * 
  */
-export class Calibre
+export class Calibre extends CalibreServices
 {
 	/**
 		@abstract Constructor
 	*/
 	public constructor(parent: IEvents, library_path: string)
 	{
-		try
-		{
-			console.info(`Calibre`);
-			this.parent = parent;
-			this.library_path = library_path;
-			this.db_path = path.join(library_path, 'metadata.db');
-			if (fs.existsSync(this.db_path))
-			{
-				this.db = new sqlite.Database(this.db_path, sqlite.OPEN_READONLY)
-			}
-			else
-			{
-				// alert('Calibre Db file not found');
-				throw new Error('Calibre Db file not found');
-			}
-		}
-		catch(e)
-		{
-			console.error('Exception occurred: ' + e)
-			throw e;
-		}
+		super(library_path);
+		console.info(`Calibre`);
+		this.parent = parent;
 	}
 	
 	/**
@@ -51,28 +35,22 @@ export class Calibre
 		console.info('Calibre.Parse');
 		await this.parent.onStart(this.library_path);
 
+		await this.prepare_custom_columns();
+		
 		const genre = await settings.genreField();
-		const genre_row = await this.get("SELECT id, label FROM custom_columns WHERE label = ?", [`${genre}`]);
-		if (! genre_row)
-		{
-			throw new Error(`The custom column ${genre} is configured but not present in the Calibre database`);
-		}
+		const genre_row = await this.cc_meta(genre);
 		const genre_id = genre_row.id;
 		console.info(`Genre field #${genre} has id ${genre_id}`);
-		this.genre_table = `custom_column_${genre_id}`;
-		this.genre_link_table = `books_custom_column_${genre_id}_link`;
+		this.genre_table = genre_row.table;
+		this.genre_link_table = genre_row.link;
 
 		const content = await settings.contentField();
 		if (content !== '')
 		{
-			const content_row = await this.get("SELECT id, label FROM custom_columns WHERE label = ?", [`${content}`]);
-			if (! content_row)
-			{
-				throw new Error(`The custom column ${content} is configured but not present in the Calibre database`);
-			}
+			const content_row = await this.cc_meta(content);
 			const content_id = content_row.id;
 			console.info(`Content field #${content} has id ${content_id}`);
-			this.content_table = `custom_column_${content_id}`;
+			this.content_table = content_row.table;
 		}
 		else
 		{
@@ -81,9 +59,7 @@ export class Calibre
 		
 		const shrinkGenres = await settings.shrinkGenres();
 		console.info(`Shrink genres to ${shrinkGenres}`);
-		let genres = await this.all(`SELECT id, value FROM ${this.genre_table} WHERE value LIKE ? ORDER BY value`, [ shrinkGenres ]);
-		console.debug(`${genres.length} Genres left`);
-		genres = Object.fromEntries(genres.map((row: any) => [row.value, row.id]));
+		let genres = await this.genres(this.genre_table, shrinkGenres);
 		genres = await this.normalize_genres(genres);
 		
 		await this.parent.onStop();
@@ -91,25 +67,6 @@ export class Calibre
 		return true;
 	}
 
-
-	/**
-	 * @abstract Encapsulation of the Sqlite get method
-	 * 
-	 */
-	get = async function(query: string, params: Array<string>) : Promise<any>
-	{
-		return this.promisify(this.db, this.db.get, query, params);
-	}
-
-
-	/**
-	 * @abstract Encapsulation of the Sqlite all method
-	 * 
-	 */
-	all = async function(query: string, params: Array<string>) : Promise<any>
-	{
-		return this.promisify(this.db, this.db.all, query, params);
-	}
 	
 	/**
 	 * @abstract Normalization is the process of inserting missed empty Genre entries
@@ -186,14 +143,12 @@ export class Calibre
 	populate_notes = async function(val: number) : Promise<void>
 	{
 		const filterTitles = await settings.filterTitles();
-		const books = await this.all(
-			`SELECT books.id, books.title, books.path, books.has_cover, books.timestamp, books.last_modified, books.author_sort FROM books ` +
-			`INNER JOIN ${this.genre_link_table} AS link ON books.id = link.book ` +
-			`WHERE link.value = ? AND books.title LIKE ?`, [val, filterTitles]);
+		const books = await this.books(this.genre_link_table, val, filterTitles); 
 		console.debug(`Books: ${JSON.stringify(books)}`);
 		for (let book of books)
 		{
-			await this.acquire_book_data(book)
+			await this.acquire_book_data(book);
+			await this.acquire_custom_columns(book);
 			await this.parent.onNote(this.library_path, book);
 		}
 	}
@@ -205,36 +160,24 @@ export class Calibre
 	 */
 	async acquire_book_data(book: {}) : Promise<void>
 	{
-		const convertHtml = await settings.convertHtml();
-		const text = await this.get(
-			`SELECT text FROM comments WHERE book = ?`, book['id']								// the comments belonging to the book
-		);
-		let comments = text['text'];
-		if (convertHtml)
+		let comments = await this.comments(book['id']);											// the comments belonging to the book
+		if (comments != undefined)
 		{
-			comments = (await turndownServices.updateSettings()).turndown(comments);			// conversion depends on setting
+			comments = await this.to_md(comments);												// if present and conversion configured
+			book['comments'] = comments;
 		}
-		book['comments'] = comments;
 		
 		if (this.content_table !== '')															// content table configured?
 		{
-			let content = await this.get(
-				`SELECT value FROM ${this.content_table} WHERE book = ?`, book['id']			// the content belonging to the book
-			);
+			let content = await this.content(this.content_table, book['id']);					// the content belonging to the book
 			if (content != undefined)
 			{
-				content = content['value'];
-				if (convertHtml)																// if present and conversion configured
-				{
-					content = turndownServices.turndown(content);
-				}
+				content = await this.to_md(content);											// if present and conversion configured
 				book['content'] = content;
 			}
 		}
 		
-		const data = await this.all(
-			`SELECT data.format, data.name FROM data WHERE data.book = ?`, book['id']			// the formats belonging to the book
-		);
+		const data = await this.formats(book['id']);											// the formats belonging to the book
 		const formats = data.map((data: any) => data['format']);
 		book['formats'] = formats;
 		if (formats.length > 0)
@@ -242,39 +185,98 @@ export class Calibre
 			book['name'] = data[0]['name'];
 		}
 		
-		const tag_data = await this.all( 														// the tags belonging to the book
-			`SELECT tags.name FROM tags
-			INNER JOIN books_tags_link AS link ON tags.id = link.tag 
-			WHERE link.book = ?`, book['id']
-		);
-		const tags = tag_data.map((data: any) => data['name'].toLowerCase());
+		const tags = await this.tags(book['id']); 												// the tags belonging to the book
 		console.debug(`Tags read: ${tags}`);
 		book['tags'] = tags;
+		
+		book['series'] = await this.series(book['id']);
+		console.debug(`Series read: ${book['series']}`);
 	}
-
+	
 	
 	/**
-	 * @abstract Converts a method with given signature and callback to a Promise returning method
+	 * @abstract Prepares configured custom columns for import
 	 * 
 	 */
-	promisify = async function(ob: object, fnc: Function, ...args: any) : Promise<any>
+	async prepare_custom_columns() : Promise<void>
 	{
-		return new Promise<any>((resolve, reject) =>
-		{			
-			fnc.bind(ob)(...args, (err: any, result: any) => {
-				
-			if (err)
+		this.custom_columns = { };
+		for await (const label of settings.eachCustomColumnLabel())							// step 1: get configured columns
+		{
+			const data = await this.cc_meta(label); 
+			this.custom_columns[label] = data;
+		}
+		
+		console.dir(this.custom_columns);		
+	}
+
+
+	/**
+	 * @abstract Equips the book data with custom columns info
+	 * 
+	 */
+	async acquire_custom_columns(book: {}) : Promise<void>
+	{
+		let custom_column_simple = [ ];
+		let custom_column_comments = [ ];
+		
+		for await (const label of settings.eachCustomColumnLabel())
+		{
+			const cc_desc = this.custom_columns[label];
+			const cc_info = await this.cc_entries(cc_desc, book['id']);
+			
+			if (cc_desc.datatype == 'comments')
 			{
-				console.error('Error occurred: ' + err)		
-				reject(err);
+				const cc_value = cc_info;
+				if (cc_value != undefined && cc_value.value != undefined)
+				{
+					custom_column_comments.push([ cc_desc.name, await this.to_md(cc_value.value) ]);
+				}
 			}
 			else
 			{
-				resolve(result);
-			}});
-		});
+				function process(cc_value: any) : any										// processes one item of a custom column
+				{
+					if (cc_desc.datatype == 'bool')
+					{
+						return cc_value ? 'yes' : 'no';
+					}
+					return cc_value;
+				};
+			
+				const cc_values =															// all items of one custom column (per one book)
+					cc_info
+					.filter((cc: any) => cc.value != undefined)
+					.map((cc: any) => process(cc.value));									// custom column values as array
+				
+				console.log(`Simple Custom Column: ${[ cc_desc.name, cc_values ]}`);
+				custom_column_simple.push([ cc_desc.name, cc_values ]);
+			}			
+		}
+		book['cc_simple'] = custom_column_simple;
+		book['cc_comments'] = custom_column_comments;
 	}
 
+
+	/**
+	 * @abstract Converts a comments like field to MD (if configured)
+	 * 
+	 * @param comments 	- comments like field
+	 * @returns			- processed field
+	 */
+	async to_md(comments: string) : Promise<string>
+	{
+		const convertHtml = await settings.convertHtml();
+		if (convertHtml)
+		{
+			let result = `<div>${comments}</div>`;
+			result = (await turndownServices.updateSettings()).turndown(result);			// conversion depends on setting
+			console.log(result);
+			return result;
+		}
+		
+		return comments;
+	}
 
 	parent: IEvents;
 	library_path: string;
@@ -283,4 +285,5 @@ export class Calibre
 	genre_table: string;
 	genre_link_table: string;
 	content_table: string;
+	custom_columns: any;
 }
