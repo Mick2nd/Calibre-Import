@@ -1,4 +1,4 @@
-import { Settings } from "./settings";
+import { Settings } from "./scriptSettings";
 
 
 module.exports = 
@@ -7,8 +7,8 @@ module.exports =
 	{
 		const pluginId = context.pluginId;
 		const indicator = '///attributes';
+		const htmlIndicator = 'purehtml';
 		
-		console.dir(context);
 		console.info(`${pluginId} : Here in Plugin default (OUTER) function`);
 		
 		
@@ -37,8 +37,6 @@ module.exports =
 		 *	@abstract The renderIt function
 		 *
 		 *	Will be invoked every time an attributes token is detected. This modifies succeeding tokens.
-		 *	TODO: improve exception handling
-		 *
 		 */
 		function renderIt(originalStyleRender: any, ...args: any) : any
 		{
@@ -83,7 +81,7 @@ module.exports =
 				}
 			}
 			
-			return '';		
+			return '';																				// we have EXCLUSIVE access to attributes render
 			// return originalStyleRender(...arguments);											// then invoke the original render function
 		}
 		
@@ -99,15 +97,15 @@ module.exports =
 				env = args[3], 
 				renderer = args[4];
 			
-			let token = tokens[idx];
+			let token = tokens[idx];										// used to render a fence as pure html
 			
-			if (token.info == 'purehtml')
+			if (token.info == htmlIndicator)
 			{
 				return token.content;
 			}
 			
-			let result = originalFenceRender(...args);
-			result = transferAttributes(token.attrs, result);
+			let result = originalFenceRender(...args);						// render a fence
+			result = transferAttributes(token.attrs, result);				// and equip the surrounding div with attributes
 			
 			return result;
 		}
@@ -173,6 +171,9 @@ module.exports =
 			let pos2 = line.search(indicator);
 			if (pos2 !== 0)
 			{
+				// TEST FOR TABLES
+				console.debug(`1: ${line}`);
+				
 				const length = state.tokens.length;															// second algorithm for nested lists
 				if (length > 1)
 				{
@@ -194,8 +195,15 @@ module.exports =
 						}
 					}							
 				}
+				if (curLine + 1 >= end)
+				{
+					console.info('Document processed');
+				}
 				return false;
 			}
+			// TEST FOR TABLES
+			console.debug(`2: ${line}`);
+				
 			if (silent)
 			{
 				return true;
@@ -242,11 +250,10 @@ module.exports =
 			 */
 			plugin: function(markdownIt: any, ruleOptions: any)
 			{
-				console.dir(ruleOptions);
 				console.info(`${pluginId} : Here in Plugin (INNER) function : ${ruleOptions.resourceBaseUrl}`);
 				
 				markdownIt.block.ruler.before('list', 'attributes', tokenizeAttributes, 
-					{alt: ['list', 'paragraph', 'reference', 'blockquote', 'fence']});
+					{alt: ['list', 'paragraph', 'reference', 'blockquote', 'fence', 'table']});
 
 				try
 				{
@@ -279,15 +286,14 @@ module.exports =
 			
 			assets: function() : any {
 				return [
-					{
+					/*{
 						inline: true,
 						text: '.meta td { background-color: blue; }',
 						mime: 'text/css',
-					},
+					},*/
 					{ name: 'markdownIt.css' },
 					{ name: 'assets/rating-html.css' },
 					{ name: 'assets/rating.css' },
-					{ name: 'assets/rating.svg' },
 					{ name: 'assets/pre-process.js' },
 					{ name: 'assets/rating.js' }
 				];

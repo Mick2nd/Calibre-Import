@@ -8,8 +8,6 @@ const fs = joplin.require('fs-extra');
 /**
  * @abstract An encapsulation of the Joplin Data API as neeeded by this app.
  * 
- * TODO: Evaluate error return code for better error handling
- * 
  */
 export class JoplinServices
 {
@@ -28,7 +26,7 @@ export class JoplinServices
 	 * @param created - created time to be used	
 	 * @param updated - updated time to be used	
 	 */
-	set_time = function(created: string, updated: string) : void
+	set_time(created: string, updated: string) : void
 	{
 		if (! created.endsWith('+00:00'))
 		{
@@ -44,9 +42,9 @@ export class JoplinServices
 	 * @abstract Puts a folder (notebook) entry into Joplin with a POST request
 	 * 
 	 * @param parent_id - id of the parent
-	 * @param title - title of the notebook to be created
+	 * @param title 	- title of the notebook to be created
 	 */
-	put_folder = async function(parent_id: string, title: string) : Promise<any>
+	async put_folder(parent_id: string, title: string) : Promise<any>
 	{
         var data = { 'title': title, 'parent_id': parent_id };
 		return await this.post(['folders'], { }, data);
@@ -57,10 +55,10 @@ export class JoplinServices
 	 * @abstract Puts a Mark-down note into Joplin with a POST request
 	 * 
 	 * @param parent_id - id of the parent notebook
-	 * @param title - title of the note
-	 * @param content - the body of the note
+	 * @param title 	- title of the note
+	 * @param content 	- the body of the note
 	 */
-	put_note = async function(parent_id: string, title: string, content: string) : Promise<any>
+	async put_note(parent_id: string, title: string, content: string) : Promise<any>
 	{
         var data = { 'title': title, 'body': content, 'parent_id': parent_id };
 		return await this.post(['notes'], { }, data);
@@ -71,10 +69,10 @@ export class JoplinServices
 	 * @abstract Puts a resource into Joplin. Before POSTing this method tries to acquire a reference
 	 * 			 to an existing resource by using its title.
 	 * 
-	 * @param meta_data - meta data containing the title of the resource
+	 * @param meta_data 	- meta data containing the title of the resource
 	 * @param resource_path - the path to an existing resource, image or other file
 	 */
-	put_resource_by_file = async function(meta_data: any, resource_path: string) : Promise<any>
+	async put_resource_by_file(meta_data: any, resource_path: string) : Promise<any>
 	{
         var title = meta_data['title'];
         var resp = await this.get_resource(title);
@@ -96,9 +94,9 @@ export class JoplinServices
 	 * 			 to an existing resource by using its title.
 	 * 
 	 * @param meta_data - meta data containing the title of the resource
-	 * @param content - the content of the resource as binary array
+	 * @param content 	- the content of the resource as binary array
 	 */
-	put_resource = async function(meta_data: any, content: Uint8Array) : Promise<any>
+	async put_resource(meta_data: any, content: Uint8Array) : Promise<any>
 	{
         var title = meta_data['title'];
         var resp = await this.get_resource(title);
@@ -119,10 +117,10 @@ export class JoplinServices
 	 * 
 	 * If the tag already exists, this tag will be used.
 	 * 
-	 * @param note_id - the note's id to which the tag is to be ssigned
-	 * @param name - the tag name
+	 * @param note_id 	- the note's id to which the tag is to be ssigned
+	 * @param name 		- the tag name
 	 */
-	put_tag = async function(note_id: string, name: string) : Promise<any>
+	async put_tag(note_id: string, name: string) : Promise<any>
 	{
 		var tag = await this.get_tag(name);
 		if (tag.length > 0)
@@ -134,14 +132,15 @@ export class JoplinServices
 			var data = { title: name };
 			tag = await this.post(['tags'], { }, data);
 		}
-		const id = tag.id || null;													// TODO: does method exist?
+		const id = tag.id || null;
 		if (id != null)
 		{
 			var data2 = { id: note_id };
 			return await this.post(['tags', id, 'notes'], { }, data2);
 		}
 		
-		return null;																// TODO: issue warning
+		console.warn(`Tag '${name}' not assignable to note`);
+		return null;
 	}
 
 
@@ -150,7 +149,7 @@ export class JoplinServices
 	 * 
 	 * @param name - the tag name to be searched
 	 */
-	get_tag = async function(name: string) : Promise<any>
+	async get_tag(name: string) : Promise<any>
 	{
         name = name.toLowerCase();
         return await this.search(name, 'tag');
@@ -163,9 +162,9 @@ export class JoplinServices
 	 * Before posting a temp file will be created because Joplin can only work with files.
 	 * 
 	 * @param meta_data - meta data containing the title
-	 * @param content - the content of the resource as binary array
+	 * @param content 	- the content of the resource as binary array
 	 */
-	post_resource = async function(meta_data: any, content: Uint8Array) : Promise<any>
+	async post_resource(meta_data: any, content: Uint8Array) : Promise<any>
 	{
 		try
 		{
@@ -190,10 +189,10 @@ export class JoplinServices
 	/**
 	 * @abstract POSTs a resource file to Joplin
 	 * 
-	 * @param meta_data - meta data containing the title
+	 * @param meta_data 	- meta data containing the title
 	 * @param resource_path - the file system path of an existing resource
 	 */
-	post_resource_by_file = async function(meta_data: any, resource_path: string) : Promise<any>
+	async post_resource_by_file(meta_data: any, resource_path: string) : Promise<any>
 	{
 		try
 		{
@@ -216,7 +215,7 @@ export class JoplinServices
 	 * 
 	 * @returns a temp file path located in the os' temp folder
 	 */
-	get_tmp_file = async function() : Promise<string>
+	async get_tmp_file() : Promise<string>
 	{
         const tempPath = path.join(os.tmpdir(), 'tmpresource');
 		await fs.mkdtemp(tempPath);
@@ -230,7 +229,7 @@ export class JoplinServices
 	 * 
 	 * @param title - the title of a resource
 	 */
-	get_resource = async function(title: string) : Promise<any>
+	async get_resource(title: string) : Promise<any>
 	{
 		var lst = [];
 		var query = { fields: 'id,size'};
@@ -254,25 +253,29 @@ export class JoplinServices
 	
 	/**
 	 * @abstract Sends a search to the Data API. Probably this request should be improved to make 
-	 *			 use of the page property.
+	 *			 use of the page property. NOT USED BY joplinData.
 	 *
-	 * @param identifier - the identifier of the item(s) to be searched
-	 * @param kind - kind of items (notes, resources..)
-	 * @returns the result of the search
+	 * @param identifier 	- the identifier of the item(s) to be searched
+	 * @param kind 			- kind of items (notes, resources..)
+	 * @returns 			- the result of the search
 	 */
-	search = async function(identifier: string, kind: string) : Promise<any>
+	async search(identifier: string, kind: string) : Promise<any>
 	{
 		var query = { query: identifier, type: kind };
 		
-		const response = this.get(['search'], query);
-		return (await this.handleError(response, 'search(get)'))['items'];
+		const response = await this.get(['search'], query);								// TODO: work with 'all' enumerators
+		return response['items'];														// TODO: test, handleError already in get
+		
+		// const response = this.get(['search'], query);
+		// return (await this.handleError(response, 'search(get)'))['items'];
 	}
 	
 	
 	/**
-	 *	@abstract Method to acquire an access token to the Joplin Data Api
+	 * @abstract Method to acquire an access token to the Joplin Data Api
+	 *			 Obsolete.
 	 */
-	acquire_token = async function() : Promise<boolean>
+	async acquire_token() : Promise<boolean>
 	{
 		const query = await joplin.data.post(['auth']);
 		var response = {};
@@ -298,7 +301,7 @@ export class JoplinServices
 	 * This uses the page and has_more properties to retrieve the whole collection addressed by the 
 	 * request.
 	 * 
-	 * @param path - the Joplin Data path parameter
+	 * @param path 	- the Joplin Data path parameter
 	 * @param query - the Joplin Data query parameter (optional)
 	 */
 	async *allChunks(path: string[], options?: any) : AsyncGenerator<[]>
@@ -326,7 +329,7 @@ export class JoplinServices
 	 * This uses the page and has_more properties to retrieve the whole collection addressed by the 
 	 * request.
 	 *
-	 * @param path - the Joplin Data path parameter
+	 * @param path 	- the Joplin Data path parameter
 	 * @param query - the Joplin Data query parameter (optional)
 	 */
 	async *all(path: string[], options?: any) : AsyncGenerator
@@ -345,10 +348,10 @@ export class JoplinServices
 	 *
 	 *  This retrieves content from Joplin resource(s)
 	 * 
-	 * 	@param path - the Joplin Data path parameter
-	 * 	@param query - the Joplin Data query parameter (optional)
+	 * 	@param path 	- the Joplin Data path parameter
+	 * 	@param query 	- the Joplin Data query parameter (optional)
 	 */
-	get = async function(path: Path, query?: any) : Promise<any>
+	async get(path: Path, query?: any) : Promise<any>
 	{
 		const response = joplin.data.get(path, query);
 		return await this.handleError(response, 'get');
@@ -360,12 +363,12 @@ export class JoplinServices
 	 *  This sends content of new resource(s). If the method addresses a single Note, the body
 	 *  data is supplemented by the creation und updated times.
 	 *
-	 * 	@param path - the Joplin Data path parameter
-	 * 	@param query - the Joplin Data query parameter (optional)
-	 *  @param body - the Joplin Data body parameter (optional) 
-	 *  @param files - the Joplin Data files parameter (optional) 
+	 * 	@param path 	- the Joplin Data path parameter
+	 * 	@param query 	- the Joplin Data query parameter (optional)
+	 *  @param body 	- the Joplin Data body parameter (optional) 
+	 *  @param files 	- the Joplin Data files parameter (optional) 
 	 */
-	post = async function(path: Path, query?: any, body?: any, files?: any[]) : Promise<any>
+	async post(path: Path, query?: any, body?: any, files?: any[]) : Promise<any>
 	{
 		if (path.length == 1 && body)
 		{
@@ -383,12 +386,12 @@ export class JoplinServices
 	 *  If the method addresses a single Note, the body data is supplemented by the creation und updated
 	 *  times.
 	 *
-	 * 	@param path - the Joplin Data path parameter
-	 * 	@param query - the Joplin Data query parameter (optional)
-	 *  @param body - the Joplin Data body parameter (optional) 
-	 *  @param files - the Joplin Data files parameter (optional) 
+	 * 	@param path 	- the Joplin Data path parameter
+	 * 	@param query 	- the Joplin Data query parameter (optional)
+	 *  @param body 	- the Joplin Data body parameter (optional) 
+	 *  @param files 	- the Joplin Data files parameter (optional) 
 	*/
-	put = async function(path: Path, query?: any, body?: any, files?: any[]) : Promise<any>
+	async put(path: Path, query?: any, body?: any, files?: any[]) : Promise<any>
 	{
 		if (path.length == 2 && body)
 		{
@@ -403,10 +406,10 @@ export class JoplinServices
 	/**
 	 *	@abstract The delete method. Probably we will use the Joplin Api method directly.
 	 *
-	 * 	@param path - the Joplin Data path parameter
-	 * 	@param query - the Joplin Data query parameter (optional)
+	 * 	@param path 	- the Joplin Data path parameter
+	 * 	@param query 	- the Joplin Data query parameter (optional)
 	 */
-	delete = async function(path: Path, query?: any) : Promise<void>
+	async delete(path: Path, query?: any) : Promise<void>
 	{
 		const response = joplin.data.delete(path, query);
 		await this.handleError(response, 'delete');
@@ -416,9 +419,9 @@ export class JoplinServices
 	 * @abstract Can be used to handle error from Joplin Data API. Throws if response contains
 	 * 			 error info, otherwise returns the response parameter.
 	 * 
-	 * @param resp - the reponse to check for errors (a Promise)
-	 * @param api - the api that caused the error
-	 * @returns the method parameter
+	 * @param resp 	- the reponse to check for errors (a Promise)
+	 * @param api 	- the api that caused the error
+	 * @returns 	- the method parameter
 	 * @throws throws on error response
 	 */
 	async handleError(resp: Promise<any>, api: string) : Promise<any>
@@ -434,6 +437,7 @@ export class JoplinServices
 	
 	created: number = new Date().valueOf();
 	updated: number = new Date().valueOf();
+	token: any;
 }
 
 export const joplinServices = new JoplinServices();

@@ -1,12 +1,7 @@
-import joplin from 'api';
-import path = require('path');
-const sqlite = joplin.require('sqlite3');
-const fs = joplin.require('fs-extra');
 import { IEvents } from './events';
 import { settings } from './settings';
 import { turndownServices } from './turndownServices';
 import { CalibreServices } from './calibreServices';
-import { appendFileSync } from 'fs';
 
 
 /**
@@ -21,7 +16,7 @@ export class Calibre extends CalibreServices
 	public constructor(parent: IEvents, library_path: string)
 	{
 		super(library_path);
-		console.info(`Calibre`);
+		console.info(`Calibre.constructor`);
 		this.parent = parent;
 	}
 	
@@ -40,6 +35,7 @@ export class Calibre extends CalibreServices
 		const genre = await settings.genreField();
 		const genre_row = await this.cc_meta(genre);
 		const genre_id = genre_row.id;
+		console.assert(genre_id, `'${genre}' is not a valid genre`);
 		console.info(`Genre field #${genre} has id ${genre_id}`);
 		this.genre_table = genre_row.table;
 		this.genre_link_table = genre_row.link;
@@ -49,6 +45,7 @@ export class Calibre extends CalibreServices
 		{
 			const content_row = await this.cc_meta(content);
 			const content_id = content_row.id;
+			console.assert(content_id, `'${content}' is not a valid content field`);
 			console.info(`Content field #${content} has id ${content_id}`);
 			this.content_table = content_row.table;
 		}
@@ -73,8 +70,9 @@ export class Calibre extends CalibreServices
 	 *
 	 * This method in turn invokes handlers in the Joplin instance and invokes the note
 	 * extraction routine.
-	 * @param {any} genres - an object with key - val - genre entries
-	 * @returns {Promise<any>} - the result object with supplemented entries
+	 * 
+	 * @param {any} genres 		- an object with key - val - genre entries
+	 * @returns {Promise<any>} 	- the result object with supplemented entries
 	 */
 	normalize_genres = async function(genres: any) : Promise<any>
 	{
@@ -138,13 +136,13 @@ export class Calibre extends CalibreServices
 	 * @abstract Queries the Calibre db for Books belonging to a given Genre.
 	 * 
 	 * In turn acquires additional book data and invokes the Joplin handler.
+	 * 
 	 * @param {number} val - the id of the specific genre the books are to be acquired for
 	 */
 	populate_notes = async function(val: number) : Promise<void>
 	{
 		const filterTitles = await settings.filterTitles();
 		const books = await this.books(this.genre_link_table, val, filterTitles); 
-		console.debug(`Books: ${JSON.stringify(books)}`);
 		for (let book of books)
 		{
 			await this.acquire_book_data(book);
@@ -186,11 +184,9 @@ export class Calibre extends CalibreServices
 		}
 		
 		const tags = await this.tags(book['id']); 												// the tags belonging to the book
-		console.debug(`Tags read: ${tags}`);
 		book['tags'] = tags;
 		
-		book['series'] = await this.series(book['id']);
-		console.debug(`Series read: ${book['series']}`);
+		book['series'] = await this.series(book['id']);											// the series of the book
 	}
 	
 	
@@ -206,14 +202,13 @@ export class Calibre extends CalibreServices
 			const data = await this.cc_meta(label); 
 			this.custom_columns[label] = data;
 		}
-		
-		console.dir(this.custom_columns);		
 	}
 
 
 	/**
 	 * @abstract Equips the book data with custom columns info
-	 * 
+	 *
+	 * @param book 		- the for which to acquire cc 
 	 */
 	async acquire_custom_columns(book: {}) : Promise<void>
 	{
@@ -230,16 +225,32 @@ export class Calibre extends CalibreServices
 				const cc_value = cc_info;
 				if (cc_value != undefined && cc_value.value != undefined)
 				{
-					custom_column_comments.push([ cc_desc.name, await this.to_md(cc_value.value) ]);
+					custom_column_comments.push({ 
+						label: cc_desc.name, 
+						value: await this.to_md(cc_value.value) });
 				}
 			}
 			else
 			{
 				function process(cc_value: any) : any										// processes one item of a custom column
-				{
+				{																			// we'll get ready values for the table
 					if (cc_desc.datatype == 'bool')
 					{
 						return cc_value ? 'yes' : 'no';
+					}
+					else if (cc_desc.datatype == 'rating')
+					{
+						let rating = cc_value;
+						if (cc_desc.allow_half_stars)
+						{
+							rating = cc_value / 2.;
+						}
+						rating = rating / 5.;
+						return `<div class="calibre-rating" rating="${rating}" />`;
+					}
+					else if (cc_desc.datatype == 'text')
+					{
+						return cc_value.replace(/(\*|\_)/g, '\\$1');
 					}
 					return cc_value;
 				};
@@ -249,8 +260,8 @@ export class Calibre extends CalibreServices
 					.filter((cc: any) => cc.value != undefined)
 					.map((cc: any) => process(cc.value));									// custom column values as array
 				
-				console.log(`Simple Custom Column: ${[ cc_desc.name, cc_values ]}`);
-				custom_column_simple.push([ cc_desc.name, cc_values ]);
+				const simple_custom_column = { label: cc_desc.name, values: cc_values };
+				custom_column_simple.push(simple_custom_column);
 			}			
 		}
 		book['cc_simple'] = custom_column_simple;
@@ -271,7 +282,6 @@ export class Calibre extends CalibreServices
 		{
 			let result = `<div>${comments}</div>`;
 			result = (await turndownServices.updateSettings()).turndown(result);			// conversion depends on setting
-			console.log(result);
 			return result;
 		}
 		

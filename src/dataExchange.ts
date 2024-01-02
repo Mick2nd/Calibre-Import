@@ -2,6 +2,7 @@ const path = require('path');
 const storage = require('node-persist');
 const chokidar = require('chokidar');
 
+
 export namespace DataExchangeNs
 {
 	/**
@@ -56,7 +57,7 @@ export namespace DataExchangeNs
 		 * @abstract Writes settings to persisted storage, meant for data exchange with the 
 		 * 			 MarkdownIt script. Invoked by Plugin onChanged - handler.
 		 */
-		public async ChangeSetting(key: string, val: any) : Promise<void>
+		public ChangeSetting(key: string, val: any) : void
 		{
 			if (this.supported.includes(key))
 			{
@@ -82,10 +83,9 @@ export namespace DataExchangeNs
 			this.watcher = chokidar.watch(this.watchPath, { persistent: true })
 			this.watcher.on('all', (event: string, path: any) => 
 			{
-			  	console.log(`${this.pluginId} : Signal arrived : ${event}, ${path}`);
+			  	console.info(`${this.pluginId} : Signal arrived : ${event}, ${path}`);
 			  	const signal = this.storage.getItemSync('signal');
 			  	this.signalListener(signal);
-				// this.onSettingChanged();
 			});			
 		}
 		

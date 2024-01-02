@@ -3,8 +3,16 @@ import { IEvents } from './events';
 import { Tree } from './joplinData';
 
 
+/**
+ * @abstract Importer unites the Calibre and Tree classes to perform the import task
+ * 
+ */
 export class Importer
 {
+	/**
+	 * @abstract Asynchronous constructor function, to be used instead of constructor (new)
+	 * 
+	 */
 	public static async default(library_path: string) : Promise<Importer>
 	{
 		const importer = new Importer();

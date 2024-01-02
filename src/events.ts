@@ -1,7 +1,7 @@
 
 /**
  * @abstract Interface for Joplin instance methods
- * 
+ * 			 Purpose is to simplify the interface between "Calibre" and "Tree" instances
  */
 export interface IEvents
 {
@@ -12,4 +12,3 @@ export interface IEvents
 	onDecrease() : void;
 	onStop() : void;
 }
-

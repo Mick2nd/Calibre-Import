@@ -1,6 +1,6 @@
 {
   "name": "joplin-plugin-calibre-import",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "scripts": {
     "dist": "webpack --env joplin-plugin-config=buildMain && webpack --env joplin-plugin-config=buildExtraScripts && webpack --env joplin-plugin-config=createArchive",
     "prepare": "npm run dist",
@@ -38,5 +38,13 @@
     "chokidar": "^3.5.3",
     "joplin-turndown-plugin-gfm": "^1.0.12",
     "turndown": "^7.1.2"
+  },
+  "eslintConfig": {
+  	"plugins": ["de.habelt-jena.CalibreImport"],
+    "env": {
+      "browser": true,
+      "node": true,
+      "de.habelt-jena.CalibreImport/custom": true
+    }
   }
 }

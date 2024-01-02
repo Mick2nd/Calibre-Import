@@ -2,7 +2,7 @@ import joplin from 'api';
 import { SettingItemType, SettingItemSubType } from 'api/types';
 import { DataExchangeNs } from './dataExchange';
 import { CalibreServices } from './calibreServices';
-const EventEmitter = require('events');
+const path = require('path');
 
 
 export enum MergeMode
@@ -26,13 +26,8 @@ export class Settings
 {
 	constructor(pluginOptions: any = null, signalListener: Function = null)
 	{
+		this.custom_column_number = 10;										// number can be easily changed
 		this.fullyRegistered = false;
-		this.pluginOptions = pluginOptions;
-		this.signalListener = signalListener;
-		if (pluginOptions)
-		{
-			this.prepare();
-		}
 	}
 	
 	/**
@@ -47,7 +42,7 @@ export class Settings
 		await joplin.settings.registerSection(this.sectionName(), this.sectionLabel());
 		await joplin.settings.registerSettings(this.descriptions(true));
 
-		await this.updateCustomColumns();
+		await this.updateCustomColumns(true);
 
 		await joplin.settings.setValue('data_dir', dataDir);
 		await joplin.settings.setValue('plugin_id', id);
@@ -60,17 +55,18 @@ export class Settings
 	 * @abstract Change handler for settings changes on the Plugin side
 	 * 
 	 */
-	async onChange(event: { keys: [string] }) : Promise<void>
+	onChange(event: { keys: [string] }) : void
 	{
 		console.info(`onChange triggered: ${event.keys}`);
 		
 		if (event.keys.includes('library_folder'))											// handles changes of the library folder
 		{
-			await this.updateCustomColumns();
+			this.updateCustomColumns(false)
+			.finally(() => { console.info('Custom Columns changed'); });
 		}
 		else
 		{
-			await this.dataExchange.ChangeSetting('signal', event);
+			this.dataExchange.ChangeSetting('signal', event);
 		}
 	}
 	
@@ -78,42 +74,68 @@ export class Settings
 	 * @abstract Updates the custom columns in the select comboboxes
 	 * 
 	 */
-	async updateCustomColumns() : Promise<void>
+	async updateCustomColumns(initial: boolean) : Promise<void>
 	{
-		let msg = '';
-		if (this.fullyRegistered)
-		{
-			msg = 
-				'The settings are already fully registered, ' + 
-				'to register with another Calibre library, you must restart the application';
-			await joplin.views.dialogs.showMessageBox(msg);
-			return;
-		}
+		const isEqual = (a: any, b: any) =>
+			Array.isArray(a) && Array.isArray(b) &&
+			a.length === b.length &&
+			a.every((element: any, index: number) => element === b[index]);				
 
-		try
+		async function getCustomColumnOptions(parent: any) : Promise<any>
 		{
-			const calibreLibrary = await this.libraryFolder();
-			if (calibreLibrary.trim() !== '')
+			try
 			{
-				const calibreServices = new CalibreServices(calibreLibrary);
-				this.custom_column_options = await calibreServices.custom_columns();
-				await joplin.settings.registerSettings(this.descriptions(false));
+				const calibreLibrary = await parent.libraryFolder();
+				const calibreServices = new CalibreServices(calibreLibrary);							// can throw
+				const custom_column_options = await calibreServices.custom_columns();
+				return { options: custom_column_options, err: undefined };
+			}
+			catch(e)
+			{
+				return { options: undefined, err: e };
+			}
+		}
+		
+		const response = await getCustomColumnOptions(this);
+		if (initial)																					// initial invokation during app start
+		{
+			this.custom_column_options = response.options;
+			await joplin.settings.registerSettings(this.descriptions(false));
+			if (response.err)																			// library was not readable
+			{
+				const msg = 
+					`'${response.err}' accessing the Calibre library. The full functionality with ` + 
+					'custom columns is not available.';
+				await joplin.views.dialogs.showMessageBox(msg);
 				return;
 			}
 		}
-		catch (e)
+		else																							// a change occurred
 		{
-			await joplin.settings.registerSettings(this.descriptions(false));
-			msg = 
-				`'${e}' accessing the Calibre library. The full functionality with ` + 
-				'custom columns is not available.';
-			await joplin.views.dialogs.showMessageBox(msg);
-			return;
-		}	
-
-		await joplin.settings.registerSettings(this.descriptions(false));
-		msg = 'No Calibre library configured. Functionality with custom columns not available.';
-		await joplin.views.dialogs.showMessageBox(msg);
+			if (response.err)
+			{
+				const msg = 
+					`'${response.err}' accessing the Calibre library. For full functionality select a ` + 
+					'valid library and restart the application.';
+				await joplin.views.dialogs.showMessageBox(msg);
+				return;
+			}
+			if (! isEqual(response.options, this.custom_column_options))								// options changed
+			{
+				if (this.custom_column_options)
+				{
+					for await (const cc of this.eachCustomColumnName())									// reset the custom column values
+					{
+						await joplin.settings.setValue(cc, 0);
+					}
+				}
+				
+				const msg = 
+					'The Calibre library changed, please restart the application';
+				await joplin.views.dialogs.showMessageBox(msg);
+				return;
+			}
+		}
 	}
 	
 	/**
@@ -124,59 +146,6 @@ export class Settings
 	{
 		const resourceDir = await joplin.settings.globalValue('resourceDir');
 		await joplin.settings.setValue('resource_dir', resourceDir);
-	}
-	
-	/**
-	 * @abstract Prepares the script side of the Settings
-	 *  
-	 */
-	prepare() : void
-	{
-		this.eventEmitter = new EventEmitter();
-		this.eventEmitter.on('activate_attributes', this.signalListener);
-		const dataDir = this.dataDirSync();
-		const pluginId = this.pluginIdSync();
-		this.dataExchange = DataExchangeNs.DataExchange.fromScript(pluginId, dataDir, (event: any) => 
-		{
-			for (const key of event.keys)
-			{
-				console.log(`${pluginId} : Changed settings : ${event.keys}, ${key}`);
-				const val = this.pluginOptions.settingValue(key);
-				this.eventEmitter.emit(key, val);
-			}
-		});
-	}
-	
-	/**
-	 * @abstract Retrieves the activate_attributes setting on the script side 
-	 */
-	activateAttributesSync() : Boolean
-	{
-		return this.pluginOptions.settingValue('activate_attributes');
-	}
-	
-	/**
-	 * @abstract Retrieves the plugin_id setting on the script side 
-	 */
-	pluginIdSync() : string
-	{
-		return this.pluginOptions.settingValue('plugin_id');
-	}
-	
-	/**
-	 * @abstract Retrieves the data_dir setting on the script side 
-	 */
-	dataDirSync() : string
-	{
-		return this.pluginOptions.settingValue('data_dir');
-	}
-	
-	/**
-	 * @abstract Retrieves the resource_dir setting on the script side 
-	 */
-	resourceDirSync() : string
-	{
-		return this.pluginOptions.settingValue('resource_dir');
 	}
 	
 	async genreField() : Promise<string>
@@ -191,10 +160,26 @@ export class Settings
 	
 	/**
 	 * @abstract Iterates asynchronously through configured custom columns
+	 * 
+	 * @returns		- settings names
+	 */
+	async *eachCustomColumnName() : any
+	{
+		for (let idx = 1; idx <= this.custom_column_number; idx++)
+		{
+			const cc = `custom_column_${idx}`;
+			yield await Promise.resolve(cc);
+		}
+	}
+	
+	/**
+	 * @abstract Iterates asynchronously through configured custom columns
+	 * 
+	 * @returns		- custom columns indices as configured
 	 */
 	async *eachCustomColumn() : any
 	{
-		for (const idx of [1, 2, 3, 4, 5])
+		for (let idx = 1; idx <= this.custom_column_number; idx++)
 		{
 			const cc = `custom_column_${idx}`;
 			const cc_id = await joplin.settings.value(cc);
@@ -207,14 +192,36 @@ export class Settings
 	
 	/**
 	 * @abstract Iterates asynchronously through configured custom column labels (column name like genre)
+	 * 
+	 * @returns		- custom columns labels
 	 */
 	async *eachCustomColumnLabel() : any
 	{
 		for await (const idx of this.eachCustomColumn())
 		{
 			const label = this.custom_column_options[idx];
-			yield await Promise.resolve(label);
+			if (!label)
+			{
+				console.warn(`Invalid label 'undefined' at index ${idx} : ${this.custom_column_options}`);
+			}
+			else
+			{
+				yield await Promise.resolve(label);
+			}
 		}
+	}
+	
+	async cacheDir() : Promise<string>
+	{
+		const fs = joplin.require('fs-extra');
+		const resourceDir = await joplin.settings.globalValue('resourceDir');
+		const pluginId = await joplin.settings.value('plugin_id');
+		const dir = path.join(resourceDir, '..', 'cache', pluginId);
+		if (!fs.existsSync(dir))
+		{
+			return "D:/Users/jsoft/Programmieren/workspace-2020-09/CalibreImport/dist";
+		}
+		return dir;
 	}
 	
 	async shrinkGenres() : Promise<string>
@@ -274,6 +281,7 @@ export class Settings
 	
 	descriptions(firstPass: boolean) : any
 	{
+		console.log(`descriptions: ${firstPass}, custom column options: ${this.custom_column_options}`);
 		if (firstPass)
 		{
 			return {
@@ -346,67 +354,15 @@ export class Settings
 				description: 'The name of the Calibre custom field for additional information. It is Comments like and may be left empty.'
 			}
 		};
+		
 		if (this.custom_column_options)
 		{
-			settings = Object.assign(settings, 
-			{		
-				'custom_column_1':
-				{
-					section: 'CalibreImport.settings',
-					public: true,
-					label: 'Custom Column 1',
-					value: 0,
-					type: SettingItemType.Int,
-					isEnum: true,
-					options: this.custom_column_options,
-					description: 'Up to 5 custom columns can be configured.'
-				},
-				'custom_column_2':
-				{
-					section: 'CalibreImport.settings',
-					public: true,
-					label: 'Custom Column 2',
-					value: 0,
-					type: SettingItemType.Int,
-					isEnum: true,
-					options: this.custom_column_options,
-					description: 'Up to 5 custom columns can be configured.'
-				},
-				'custom_column_3':
-				{
-					section: 'CalibreImport.settings',
-					public: true,
-					label: 'Custom Column 3',
-					value: 0,
-					type: SettingItemType.Int,
-					isEnum: true,
-					options: this.custom_column_options,
-					description: 'Up to 5 custom columns can be configured.'
-				},
-				'custom_column_4':
-				{
-					section: 'CalibreImport.settings',
-					public: true,
-					label: 'Custom Column 4',
-					value: 0,
-					type: SettingItemType.Int,
-					isEnum: true,
-					options: this.custom_column_options,
-					description: 'Up to 5 custom columns can be configured.'
-				},
-				'custom_column_5':
-				{
-					section: 'CalibreImport.settings',
-					public: true,
-					label: 'Custom Column 5',
-					value: 0,
-					type: SettingItemType.Int,
-					isEnum: true,
-					options: this.custom_column_options,
-					description: 'Up to 5 custom columns can be configured.'
-				}
-			});
+			console.log('custom_column_options available');
+			settings = Object.assign(
+				settings, 
+				this.custom_column_descriptions(this.custom_column_number));					// dynamicallly generated
 		}
+		
 		settings = Object.assign(settings, 
 		{
 			'filter_genres':
@@ -498,12 +454,41 @@ export class Settings
 		return settings;
 	}
 	
+	/**
+	 * @abstract Given the number of custom columns this functions produces a description object
+	 * 
+	 * @param no 	- number of custom columns to be generated
+	 */
+	custom_column_descriptions(no: number) : any
+	{
+		let descriptions = { };
+		
+		for (let idx = 1; idx <= no; idx++)
+		{
+			const cc = `custom_column_${idx}`;
+			const cc_val =		
+				{
+					section: 'CalibreImport.settings',
+					public: true,
+					label: `Custom Column ${idx}`,
+					value: 0,
+					type: SettingItemType.Int,
+					isEnum: true,
+					options: this.custom_column_options,
+					description: `Up to ${no} custom columns can be configured.`
+				};
+			descriptions[cc] = cc_val;
+		}
+		
+		return descriptions;
+	}
+	
+
 	settings: any;
 	custom_column_options: any = null;
-	pluginOptions: any;
+	custom_column_number: number;
 	dataExchange: DataExchangeNs.DataExchange;
 	eventEmitter: any;
-	signalListener: Function;
 	fullyRegistered: boolean;
 }
 

@@ -20,7 +20,6 @@ export class CalibreServices
 			const sqlite = joplin.require('sqlite3');
 			const fs = joplin.require('fs-extra');
 
-			console.info(`Calibre`);
 			this.library_path = library_path;
 			this.db_path = path.join(library_path, 'metadata.db');
 			if (fs.existsSync(this.db_path))
@@ -161,7 +160,6 @@ export class CalibreServices
 			 WHERE books.id = ?`;
 
 		const row = await this.get(sql, [`${book_id}`]);
-		console.dir(row);
 		if (row != undefined && row.series != undefined && row.idx != undefined)
 		{
 			return `${row.series} : ${row.idx}`;
@@ -194,6 +192,10 @@ export class CalibreServices
 		}
 		const display = JSON.parse(row.display);										// display entries are merged
 		row = Object.assign(row, display);
+		if (display.interpret_as && display.interpret_as ==='html')
+		{
+			row.interpret_as_html = true;												// introduce an additional field for HTML like comments fields 
+		}
 		
 		return row;
 	}

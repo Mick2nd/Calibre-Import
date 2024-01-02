@@ -1,14 +1,34 @@
 
-.bg {  
+.calibre-rating-bg {  
 	background-image: url("rating.svg");
 	background-repeat: no-repeat;
 	background-size: contain;
 	color: transparent;
 }
 
-.bg-empty {
-	background-repeat: no-repeat;
-	background-size: contain;
-	color: transparent;
+.calibre-cover img { 
+	height: 600px; 
 }
 
+.calibre-metadata-table, .calibre-embedded-table { 
+	border-style: hidden; 
+	border-collapse: collapse;
+	width: 100%; 
+}
+
+.calibre-metadata-table td { 
+	font-size: small; 
+}
+
+.calibre-metadata-table td:nth-child(odd) { 
+	font-style: Italic 
+}
+
+.calibre-embedded-table strong { 
+	font-size: large; 
+	font-weight: 600; 
+}
+
+.calibre-rating { 
+	width: 80px; 
+}

@@ -1,6 +1,6 @@
 import { settings } from "./settings";
-
 var turndown = require('turndown');
+
 
 /**
  * @abstract A Wrapper for the nodejs turndown module. It adds a rule to the turndown instance for insertion
@@ -70,30 +70,35 @@ export class TurndownServices
 		}
 		if (node.nodeName === 'TABLE')
 		{
-			console.dir(node);
-			if (node.firstElementChild.nodeName !== 'THEAD')				// TODO: remove
-			// if(! node.innerHTML.toLowerCase().includes('thead'))
-			{
-				return true;												// requires extra handling
-			}
+			// if (node.firstElementChild.nodeName !== 'THEAD')				// TODO: remove
+			return true;													// requires extra handling
 		}
 		
 		return false;
 	}
 	
-	
+
+	/**
+	 * @abstract Performs the replacement of the TABLE filter
+	 */	
 	tableReplacement(content: string, node: any, options: any) : string
 	{
 		this.skipTable = true;
 		const align = this.inspectTable(node);
-		console.debug(`Alignment: ${align}`);
 		let table = this.turndown(node.outerHTML);
-		// table = table.substring(table.indexOf('\n') + 1);
 		table = this.applyAlign(table, align);
+		if (this.insertAttributes)
+		{
+			table = '///attributes:class=calibre-embedded-table\n' + table;
+		}
 		return table;
 	}
 	
 	
+	/**
+	 * @abstract Inspects a table for alignment attributes and returns them
+	 * 
+	 */
 	inspectTable(node: any) : any
 	{
 		let alignment = [];
@@ -122,7 +127,11 @@ export class TurndownServices
 		
 		return alignment;
 	}
-	
+
+	/**
+	 * @abstract Applies alignment to table columns as part of table handling
+	 * 			 The second line of the markdown is modified
+	 */	
 	applyAlign(table: string, align: []) : string
 	{
 		let rows = table.split('\n');
@@ -169,8 +178,6 @@ export class TurndownServices
 		}
 		if ((node.nodeName === 'OL' || node.nodeName === 'UL') && node.attributes.length > 0)
 		{
-			console.debug(`Ordered list with styles: ${node.attributes['style'].nodeValue}`);
-			console.dir(node);
 			return true;
 		}
 		return false;
@@ -187,7 +194,6 @@ export class TurndownServices
 		{
 			attributes.push(attr);
 		}
-		console.dir(attributes);
 		attributes = attributes.map((attr: any) => `${attr.nodeName}=${attr.nodeValue}`);
 		const entry = `///attributes:${attributes.join(',')}\n`;
 		this.skip = true;
