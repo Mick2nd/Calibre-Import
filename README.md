@@ -4,21 +4,17 @@ This is a Joplin plugin.
 
 ## Two Plugins in One Package
 
-There are two plugins in this package. 
+There are two plugins in this package.
 
-The first one is the Calibre Import plugin. It is able to import a Calibre Library database into
-Joplin. 
+The first one is the Calibre Import plugin. It is able to import a *Calibre* Library database into *Joplin*.
 
-The second one is the Attributes Content plugin. It intercepts the Markdown-it token stream and detects embedded Attribute
-definitions. Those are used to equip the next HTML element with attributes. This second plugin is used by the first one to implement
-a Html to Markdown translation.
+The second one is the Attributes Content plugin. It intercepts the Markdown-it token stream and detects embedded Attribute definitions. Those are used to equip the next HTML element with attributes. This second plugin is used by the first one to implement a Html to Markdown translation.
 
 ## The Calibre Import
 
-After the installation you can import Calibre Library metadata into Joplin. The imported data include the title, the authors, the
-cover (if one exists), links to the existent book formats, the comments section and an additional content section (custom field).
-The data are imported into the selected Joplin sub folder, taking into account the book genres, a hierarchical arranged custom
-field.
+After the installation you can import Calibre Library metadata into Joplin. The imported data include the title, the authors, the cover (if one exists), links to the existent book formats, the comments section and an additional content section (custom field).
+
+The data are imported into the selected Joplin sub folder, taking into account the book genres, a hierarchical arranged custom field.
 
 All working can be controlled by a set of settings in the *Calibre Import* settings page, the most of which can be used as is for 
 first trials.
@@ -65,9 +61,7 @@ Spoilers expanded:
 
 ### For What it was Meant
 
-Primarily this content plug-in is to be used by the *Calibre Import*. The import translates *Html* into *MD*
-for consistency reasons. The Html can contain lists with attributes. That's why sometimes attributes are
-required to give a compatible view.
+Primarily this content plug-in is to be used by the *Calibre Import*. The import translates *Html* into *MD* for consistency reasons. The Html can contain lists with attributes. That's why sometimes attributes are required to give a compatible view.
 
 ### For What it can be Used
 
@@ -97,7 +91,11 @@ What can be done:
 1. Equip the generated Html with class names or ids and use those in style definitions
 1. Continue ordered lists with the start attribute
 1. Make the bullets of lists disappear (*list-style-type: none*)
-1. Generally all attributes for the Html tag in question are possible
+1. Generally all attributes for the Html tag in question are possible, for instance:
+   - id
+   - class (classes are added to pre-existing classes)
+   - style (e.g. inline style)
+   - other supported attributes
 
 ### Samples
 
@@ -118,6 +116,16 @@ This gives us the following view:
 ![Generated view of lists](./assets/media/Lists%20with%20Attributes.png)
 
 ## Release Notes
+
+### 1.1.0
+
+The scope of the *attributes* content plug-in was extended by ([see above](#scope)):
+
+* table cells (header and body)
+  The attributes in a cell must have the following shape:
+  `///attributes:<attributes definitions>::<cell content>`
+
+Additionally *Calibre* custom columns are supported. Up to 10 custom columns can be configured in the *Settings*. They are taken from an existing Calibre library. Without such an existing Calibre library (to be configured) the extra functionality is not available.
 
 ### 1.0.3
 

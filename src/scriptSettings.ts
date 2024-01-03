@@ -8,6 +8,10 @@ const EventEmitter = require('events');
  */
 export class Settings
 {
+	/**
+	 * @abstract Constructor
+	 * 
+	 */
 	constructor(pluginOptions: any, signalListener: Function)
 	{
 		this.pluginOptions = pluginOptions;
@@ -17,7 +21,8 @@ export class Settings
 	
 	/**
 	 * @abstract Prepares the script side of the Settings
-	 *  
+	 *			 This installs a handler for setting changes. It emits events on changes of the the
+	 *			 'activate_attributes' setting.
 	 */
 	prepare() : void
 	{
@@ -29,7 +34,6 @@ export class Settings
 		{
 			for (const key of event.keys)
 			{
-				console.log(`${pluginId} : Changed settings : ${event.keys}, ${key}`);
 				const val = this.pluginOptions.settingValue(key);
 				this.eventEmitter.emit(key, val);
 			}

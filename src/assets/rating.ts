@@ -8,10 +8,10 @@ export default function equip_calibre_rating()
 	addEventListener("error", (event) => { });
 
 	const div = document.getElementById('calibre-rating-assets');
-	if (!div) return;
+	if (!div) { return; }
 	
 	const cache = div.attributes['custom'].value.trim();
-	if (cache === '') return;
+	if (cache === '') { return; }
 	
 	let containers = document.getElementsByClassName("calibre-rating");
 	let rating = 0;
@@ -31,7 +31,6 @@ export default function equip_calibre_rating()
 		catch(e) 
 		{ 
 			console.error(e);
-			window.alert('Script executed');		
 		}
 	}
 }
@@ -44,5 +43,5 @@ equip_calibre_rating();
 setInterval(() => 
 { 
 	let containers = document.getElementsByClassName("calibre-rating");
-	if (containers[0] !== undefined && containers[0].children.length == 0) equip_calibre_rating(); 
+	if (containers[0] !== undefined && containers[0].children.length == 0) { equip_calibre_rating(); }
 }, 50);

@@ -48,7 +48,6 @@ module.exports =
 				renderer = args[4];
 			
 			let token = tokens[idx];
-			console.debug(`${pluginId} : Attributes Render token info : ${token.info}`);
 			if (token.info.includes(indicator)) 													// modification only for list-styling fence
 			{
 				try
@@ -62,15 +61,16 @@ module.exports =
 					let nextToken = tokens[nextIdx];
 					nextIdx ++;
 					
-					console.debug(`${pluginId}, next token type : ${nextToken.type}`);
 					if (['bullet_list_open', 'ordered_list_open', 'paragraph_open', 
-						'blockquote_open', 'heading_open', 'table_open', 'hr', 'fence']
+						'blockquote_open', 'heading_open', 'table_open', 'hr', 'fence', 
+						'td_open', 'th_open']
 						.includes(nextToken.type))													// TODO: supplement
 					{
 						for (const attr of attrs)
 						{
 							nextToken.attrPush(attr);
 						}
+						console.log(`${pluginId}: '${nextToken.tag}' equipped with '${JSON.stringify(attrs)}'`);
 					}
 					return '';																		// no own output !
 				}
@@ -161,55 +161,27 @@ module.exports =
 		 */
 		function tokenizeAttributes(state: any, start: number, end: number, silent: boolean)
 		{
+			if (state.level == 0)
+			{
+				state.level ++;
+				state.md.block.tokenize(state, start, end, silent);									// assumption: complete tokenization at level 1
+				postProcessLists(state);
+				postProcessTables(state);
+				console.info('Document processed');
+				
+				return true;
+			}
+			
 		    let curLine = state.line;
 		    let pos = state.bMarks[curLine] + state.tShift[curLine],
 		    	max = state.eMarks[curLine];
 
 			let line = state.src.slice(pos, max);
-			console.debug(`${pluginId} : ${state.line} : ${state.bMarks[curLine]} : ${state.tShift[curLine]} : ${state.eMarks[curLine]} : ${line}`);
-			
 			let pos2 = line.search(indicator);
-			if (pos2 !== 0)
-			{
-				// TEST FOR TABLES
-				console.debug(`1: ${line}`);
+			if (pos2 !== 0) { return false; }
 				
-				const length = state.tokens.length;															// second algorithm for nested lists
-				if (length > 1)
-				{
-					let lastToken = state.tokens[length - 2];
-					if (lastToken.type === 'inline')														// last token == inline token ?
-					{
-						let content = lastToken.content.split('\n');
-						console.debug(`${pluginId} : Found inline token : ${JSON.stringify(content)}`);
-						if (content.length >= 2 && content[1].includes(indicator))							// detection of these kinds of attributes
-						{
-							console.debug(`${pluginId} : Performing Attributes post handling`);
+			if (silent) { return true; }
 
-							lastToken.content = content[0];													// rewrite content
-							const attributes = content[1];
-
-							let token = state.push('attributes', 'div', 0);									// and add new token
-							token.info = attributes;
-							addAttributes(token, attributes);
-						}
-					}							
-				}
-				if (curLine + 1 >= end)
-				{
-					console.info('Document processed');
-				}
-				return false;
-			}
-			// TEST FOR TABLES
-			console.debug(`2: ${line}`);
-				
-			if (silent)
-			{
-				return true;
-			}
-
-			console.debug(`${pluginId} : Token detected : ${line}`);
 			let token = state.push('attributes', 'div', 0);
 			token.info = line;
 			addAttributes(token, line);
@@ -217,6 +189,94 @@ module.exports =
 			state.line ++;			
 			
 			return true;
+		}
+
+		/**
+		 * @abstract Processes embedded (nested) lists after the tokenizer was run.
+		 * 
+		 */		
+		function postProcessLists(state: any)
+		{
+			for (const tokens of enumTokenSequence(state, [ 'list_item_open', 'paragraph_open', 'inline', 'paragraph_close' ]))
+			{
+				let inlineToken: any = tokens.inlineToken;
+				const idx = tokens.index;
+				let content = inlineToken.content.split('\n');
+
+				if (content.length >= 2 && content[1].includes(indicator))								// detection of these kinds of attributes
+				{
+					inlineToken.content = content[0];													// rewrite content
+					const attributes = content[1];
+
+					let token = new state.Token('attributes', 'div', 0);								// and create new token
+					token.info = attributes;
+					addAttributes(token, attributes);
+					state.tokens.splice(idx + 4, 0, token);												// insert after p
+				}
+			}
+		}
+		
+		/**
+		 * @abstract Processes embedded (nested) table items after the tokenizer was run.
+		 * 
+		 */		
+		function postProcessTables(state: any)
+		{
+			/**
+			 * @abstract Handles a single table item
+			 * 
+			 */
+			function handleTableItem(state: any, tokens: any)
+			{
+				let inlineToken: any = tokens.inlineToken;												// inline token - one liner
+				const idx = tokens.index;
+
+				const content = inlineToken.content.replace(
+					/\/\/\/attributes\:.*?\:\:/g, '');
+				const attributes = inlineToken.content.replace(
+					/(\/\/\/attributes\:.*?)\:\:.*?$/g, '$1');
+				inlineToken.content = content;
+
+				let token = new state.Token('attributes', 'div', 0);									// and create new token
+				token.info = attributes;
+				addAttributes(token, attributes);
+				state.tokens.splice(idx, 0, token);														// insert before td / th
+			}
+			
+			for (const tokens of enumTokenSequence(state, [ 'th_open', 'inline', 'th_close' ]))
+			{
+				handleTableItem(state, tokens);
+			}			
+			for (const tokens of enumTokenSequence(state, [ 'td_open', 'inline', 'td_close' ]))
+			{
+				handleTableItem(state, tokens);
+			}			
+		}
+
+		/**
+		 * @abstract Enumerates all token sequences with a given type sequence. The sequence must
+		 * 			 contain an inline token with attributes.
+		 * 
+		 * @param state 	- the state object
+		 * @param sequence 	- token type sequence
+		 */		
+		function *enumTokenSequence(state: any, sequence: string[])
+		{
+			const tokens: [] = state.tokens;
+			const len = sequence.length;
+			const indexInline = sequence.indexOf('inline');
+			
+			for (let idx = tokens.length - len; idx >= 0; idx --)
+			{
+				const candidateTokens = tokens.slice(idx, idx + len);
+				const inlineToken: any = candidateTokens[indexInline];
+				const every = candidateTokens.every(
+					(token: any, idx: number) => token.type === sequence[idx]);
+				if (every && inlineToken.content.includes(indicator))
+				{
+					yield { tokens: candidateTokens, index: idx, inlineToken: inlineToken };
+				}
+			}
 		}
 		
 		let settings = null;
@@ -228,15 +288,14 @@ module.exports =
 		 */		
 		function signalListener(blockRuler: any, activate_attributes: Boolean) : void
 		{
-			console.debug(`${pluginId} : Read settings : ${activate_attributes}`);
 			if (! activate_attributes)
 			{
-			  	console.debug(`${pluginId} : Disabled attributes`);
+			  	console.log(`${pluginId} : Disabled attributes`);
 				blockRuler.disable(['attributes'], true);
 			}
 			else
 			{
-			  	console.debug(`${pluginId} : Enabled attributes`);
+			  	console.log(`${pluginId} : Enabled attributes`);
 				blockRuler.enable(['attributes'], true);
 			}
 		}

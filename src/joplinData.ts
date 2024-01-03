@@ -330,7 +330,7 @@ export class Note extends Node
 	 */
 	async spoiler(label: string, content: string) : Promise<string>
 	{
-		if (!content) return '';
+		if (!content) { return ''; }
 		
 		if (await settings.useSpoilers())
 		{

@@ -5,6 +5,13 @@ import { CalibreServices } from './calibreServices';
 const path = require('path');
 
 
+/**
+ * @abstract The Merge Mode for the import controls the action when notes from Calibre meet with
+ * 			 existing notes in Joplin.
+ * 			 - Leave 	- Notes in Joplin are left as is
+ * 			 - Merge 	- Notes in Joplin are replaced if the note in Calibre is newer
+ * 			 - Replace	- Notes in Joplin are always replaced
+ */
 export enum MergeMode
 {
 	Leave,
@@ -12,6 +19,12 @@ export enum MergeMode
 	Replace
 }
 
+/**
+ * @abstract The Cleanup Mode controls the action what needs to be done with left-over-nodes which
+ * 			 were not imported during the current session.
+ * 			 Leave		- the are left
+ * 			 Cleanup	- they are deleted
+ */
 export enum CleanupMode
 {
 	Leave,
@@ -24,7 +37,10 @@ export enum CleanupMode
  */
 export class Settings
 {
-	constructor(pluginOptions: any = null, signalListener: Function = null)
+	/**
+	 * @abstract Constructor
+	 */
+	constructor()
 	{
 		this.custom_column_number = 10;										// number can be easily changed
 		this.fullyRegistered = false;
@@ -52,8 +68,9 @@ export class Settings
 	}
 	
 	/**
-	 * @abstract Change handler for settings changes on the Plugin side
-	 * 
+	 * @abstract Change handler for settings changes on the Plugin side.
+	 * 			 Library Folder changes are used to update the custom columns definitions.
+	 * 			 All other changes are reported to the Markdown-it script.
 	 */
 	onChange(event: { keys: [string] }) : void
 	{
@@ -76,11 +93,19 @@ export class Settings
 	 */
 	async updateCustomColumns(initial: boolean) : Promise<void>
 	{
+		/**
+		 * @abstract Comapres 2 arrays for equality
+		 * 
+		 */
 		const isEqual = (a: any, b: any) =>
 			Array.isArray(a) && Array.isArray(b) &&
 			a.length === b.length &&
 			a.every((element: any, index: number) => element === b[index]);				
 
+		/**
+		 * @abstract Queries the new options from the Calibre library db
+		 * 
+		 */
 		async function getCustomColumnOptions(parent: any) : Promise<any>
 		{
 			try
@@ -140,19 +165,24 @@ export class Settings
 	
 	/**
 	 * @abstract The global resource dir is set as local (plugin) setting 
-	 * 
 	 */
 	async setResourceDir() : Promise<void>
 	{
 		const resourceDir = await joplin.settings.globalValue('resourceDir');
 		await joplin.settings.setValue('resource_dir', resourceDir);
 	}
-	
+
+	/**
+	 * @abstract Returns the Genre Field
+	 */	
 	async genreField() : Promise<string>
 	{
 		return await joplin.settings.value('genre_field');
 	}
 	
+	/**
+	 * @abstract Returns the Content Field
+	 */	
 	async contentField() : Promise<string>
 	{
 		return await joplin.settings.value('content_field');
@@ -211,6 +241,13 @@ export class Settings
 		}
 	}
 	
+	
+	/**
+	 * @abstract Returns the Cache folder where the Plugin assets are stored
+	 * 			 TODO: check for the development version of the plugin
+	 * 
+	 * @returns		- the cache dir or the dist folder in Eclipse for development
+	 */
 	async cacheDir() : Promise<string>
 	{
 		const fs = joplin.require('fs-extra');
@@ -224,64 +261,112 @@ export class Settings
 		return dir;
 	}
 	
+	/**
+	 * @abstract Returns a SQL pattern for Genres to be imported
+	 */	
 	async shrinkGenres() : Promise<string>
 	{
 		return await joplin.settings.value('filter_genres');
 	}
 	
+	/**
+	 * @abstract Returns a SQL pattern for Titles to be imported
+	 */	
 	async filterTitles() : Promise<string>
 	{
 		return await joplin.settings.value('filter_titles');
 	}
 	
+	/**
+	 * @abstract Returns a flag controlling the use of Spoilers (plugin) for comments - like fields
+	 */	
 	async useSpoilers() : Promise<boolean>
 	{
 		return await joplin.settings.value('use_spoilers');
 	}
 	
+	/**
+	 * @abstract Returns the cover height for cover images. A CSS style is generated for this.
+	 */	
 	async coverHeight() : Promise<string>
 	{
 		return await joplin.settings.value('cover_height');
 	}
 	
+	/**
+	 * @abstract Controls the translation of Comments - like fields
+	 */	
 	async convertHtml() : Promise<boolean>
 	{
 		return await joplin.settings.value('convert_html');
 	}
 	
+	/**
+	 * @abstract Controls the generation of Attributes. This makes only sense if the markdown-it
+	 * 			 plugin is activated.
+	 */	
 	async insertAttributes() : Promise<boolean>
 	{
 		return await joplin.settings.value('insert_attributes');
 	}
 	
+	/**
+	 * @abstract Returns the Calibre Library folder. Used for custom columns
+	 * 
+	 */
 	async libraryFolder() : Promise<string>
 	{
 		return await joplin.settings.value('library_folder');
 	}
 	
+	/**
+	 * @abstract Returns the Merge Mode. See above.
+	 * 
+	 */
 	async mergeMode() : Promise<MergeMode>
 	{
 		return await joplin.settings.value('merge_mode');
 	}
 	
+	/**
+	 * @abstract Returns the Cleanup Mode. See above.
+	 * 
+	 */
 	async cleanupMode() : Promise<CleanupMode>
 	{
 		return await joplin.settings.value('cleanup_mode');
 	}
 	
+	/**
+	 * @abstract The section name to be used internally by Joplin for these settings
+	 */
 	sectionName() : string
 	{
 		return 'CalibreImport.settings';
 	}
 	
+	/**
+	 * @abstract The section label name to be used by Joplin for these settings
+	 */
 	sectionLabel() : any
 	{
 		return { label: 'Calibre Import' };
 	}
 	
+	/**
+	 * @abstract Returns the descriptions of the settings how they are needed by Joplin.
+	 * 			 This is done in 2 passes:
+	 * 			 - the first pass returns settings which are always required
+	 * 			 - the second pass returns all other settings including custom columns
+	 * 
+	 * @param firstPass - true for the first pass invocation
+	 * @returns			- the descriptions for the settings
+	 */
 	descriptions(firstPass: boolean) : any
 	{
-		console.log(`descriptions: ${firstPass}, custom column options: ${this.custom_column_options}`);
+		console.log(
+			`descriptions: ${firstPass}, custom column options: ` + 
+			`${JSON.stringify(this.custom_column_options)}`);
 		if (firstPass)
 		{
 			return {
@@ -458,6 +543,7 @@ export class Settings
 	 * @abstract Given the number of custom columns this functions produces a description object
 	 * 
 	 * @param no 	- number of custom columns to be generated
+	 * @returns		- descriptions for custom columns
 	 */
 	custom_column_descriptions(no: number) : any
 	{
